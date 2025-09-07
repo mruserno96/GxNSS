@@ -12,7 +12,7 @@ API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 app = Flask(__name__)
 
-# Cache already verified users to speed up detection
+# Cache for already verified users to speed up channel detection
 verified_users = set()
 
 # Messages
@@ -61,48 +61,38 @@ Get access to an enormous collection of high-value courses that work effectively
 Don’t miss this incredible offer. Unlock all courses today for only ₹79 and save big!
 """
 
-# Send a text message
-def send_message(chat_id, text, reply_markup=None):
-    data = {
+# Send text message with optional inline buttons
+def send_message(chat_id, text, inline_keyboard=None):
+    payload = {
         "chat_id": chat_id,
         "text": text,
         "parse_mode": "HTML"
     }
-    if reply_markup:
-        data["reply_markup"] = reply_markup
-    requests.post(f"{API_URL}/sendMessage", json=data)
+    if inline_keyboard:
+        payload["reply_markup"] = {"inline_keyboard": inline_keyboard}
+    requests.post(f"{API_URL}/sendMessage", json=payload)
 
-# Send a photo
+# Send photo
 def send_photo(chat_id, photo_url):
-    requests.post(f"{API_URL}/sendPhoto", json={
-        "chat_id": chat_id,
-        "photo": photo_url
-    })
+    requests.post(f"{API_URL}/sendPhoto", json={"chat_id": chat_id, "photo": photo_url})
 
-# Fast channel membership check
-def get_chat_member(chat_id, user_id):
-    try:
-        resp = requests.get(f"{API_URL}/getChatMember", params={
-            "chat_id": chat_id,
-            "user_id": user_id
-        }, timeout=3)
-        resp.raise_for_status()
-        return resp.json().get("result", {})
-    except Exception as e:
-        print(f"Membership check failed: {e}")
-        return {}
-
+# Check channel membership fast
 def check_membership(user_id):
     if user_id in verified_users:
         return True
-    member = get_chat_member(CHANNEL, user_id)
-    status = member.get("status", "")
-    if status in ["member", "administrator"]:
-        verified_users.add(user_id)
-        return True
+    try:
+        resp = requests.get(f"{API_URL}/getChatMember", params={
+            "chat_id": CHANNEL,
+            "user_id": user_id
+        }, timeout=3).json()
+        status = resp.get("result", {}).get("status", "")
+        if status in ["member", "administrator"]:
+            verified_users.add(user_id)
+            return True
+    except Exception as e:
+        print(f"Membership check failed: {e}")
     return False
 
-# Webhook route
 @app.route("/", methods=["POST"])
 def webhook():
     data = request.get_json(force=True)
@@ -113,7 +103,9 @@ def webhook():
         chat_id = message["chat"]["id"]
         user_id = message["from"]["id"]
 
-        if "text" in message and message["text"] in ["/start", "try_again"]:
+        text = message.get("text", "")
+
+        if text in ["/start", "try_again"]:
             if check_membership(user_id):
                 # Step 1: Channel joined
                 send_message(chat_id, "✅ Channel Joined Successfully!")
@@ -122,53 +114,44 @@ def webhook():
                 send_message(chat_id, courses_text)
 
                 # Step 3: Bundle + inline Buy Now button
-                keyboard = {
-                    "inline_keyboard": [
-                        [{"text": "Buy Now For ₹79", "callback_data": "buy_79"}]
-                    ]
-                }
-                send_message(chat_id, bundle_text, reply_markup=keyboard)
+                keyboard = [[{"text": "Buy Now For ₹79", "callback_data": "buy_79"}]]
+                send_message(chat_id, bundle_text, inline_keyboard=keyboard)
             else:
-                # Ask user to join channel
-                keyboard = {
-                    "inline_keyboard": [
-                        [{"text": "Join Channel", "url": f"https://t.me/{CHANNEL.strip('@')}"}],
-                        [{"text": "✅ Try Again", "callback_data": "check_join"}]
-                    ]
-                }
-                send_message(chat_id, "📢 Please join the channel to access premium courses.", reply_markup=keyboard)
+                # Ask user to join channel first
+                keyboard = [
+                    [{"text": "Join Channel", "url": f"https://t.me/{CHANNEL.strip('@')}"}],
+                    [{"text": "✅ Try Again", "callback_data": "check_join"}]
+                ]
+                send_message(chat_id, "📢 Please join the channel to access premium courses.", inline_keyboard=keyboard)
 
-    # Handle callback queries
+    # Handle inline button clicks
     if "callback_query" in data:
         query = data["callback_query"]
         chat_id = query["message"]["chat"]["id"]
         user_id = query["from"]["id"]
+        callback_data = query.get("data")
 
-        if query.get("data") == "check_join":
+        if callback_data == "check_join":
             if check_membership(user_id):
                 send_message(chat_id, "✅ Channel Joined Successfully!")
                 send_message(chat_id, courses_text)
-                keyboard = {
-                    "inline_keyboard": [
-                        [{"text": "Buy Now For ₹79", "callback_data": "buy_79"}]
-                    ]
-                }
-                send_message(chat_id, bundle_text, reply_markup=keyboard)
+                keyboard = [[{"text": "Buy Now For ₹79", "callback_data": "buy_79"}]]
+                send_message(chat_id, bundle_text, inline_keyboard=keyboard)
             else:
                 send_message(chat_id, "⚠ Please join the channel first!")
 
-        elif query.get("data") == "buy_79":
+        elif callback_data == "buy_79":
             # Send QR + UPI instructions
             send_photo(chat_id, "https://mruser96.42web.io/qr.jpg")
             send_message(chat_id, "📌 UPI - 7219011336@fam\n\nSEND SS OF PAYMENT WITH YOUR TELEGRAM USERNAME")
 
     return "OK"
 
-# Set webhook
+# Set webhook automatically
 @app.before_first_request
 def set_webhook():
     requests.post(f"{API_URL}/setWebhook", json={"url": WEBHOOK_URL})
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", "5000"))
+    port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
