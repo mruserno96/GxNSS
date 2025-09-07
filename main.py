@@ -8,7 +8,7 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
-CHANNEL = "@GxNSSupdates"  # Only one channel now
+CHANNEL = "@GxNSSupdates"  # The channel handle
 
 app = Flask(__name__)
 
@@ -17,7 +17,7 @@ API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 def send_message(chat_id, text, reply_markup=None):
     data = {
         "chat_id": chat_id,
-        "text": text,
+        "text": text
     }
     if reply_markup:
         data["reply_markup"] = reply_markup
@@ -32,6 +32,7 @@ def get_chat_member(chat_id, user_id):
 @app.route("/", methods=["POST"])
 def webhook():
     data = request.get_json(force=True)
+
     if "message" in data and "text" in data["message"]:
         chat_id = data["message"]["chat"]["id"]
         text = data["message"]["text"]
@@ -49,6 +50,7 @@ def webhook():
         user_id = query["from"]["id"]
         chat_id = query["message"]["chat"]["id"]
 
+        # Check if user is a member of the channel
         member = get_chat_member(CHANNEL, user_id)
         status = member.get("result", {}).get("status", "")
 
@@ -66,5 +68,5 @@ def set_webhook():
     requests.post(url, json=data)
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", "5000"))
     app.run(host="0.0.0.0", port=port)
