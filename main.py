@@ -16,7 +16,6 @@ SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY")
 
 CHANNEL = "@GxNSSupdates"
 
-# Initialize app and supabase client
 app = Flask(__name__)
 API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -25,13 +24,16 @@ def send_message(chat_id, text, reply_markup=None):
     data = {"chat_id": chat_id, "text": text}
     if reply_markup:
         data["reply_markup"] = reply_markup
-    requests.post(f"{API_URL}/sendMessage", json=data)
+    requests.post(f"{API_URL}/sendMessage", json=data, timeout=1)
 
 def get_chat_member(chat_id, user_id):
     url = f"{API_URL}/getChatMember"
     params = {"chat_id": chat_id, "user_id": user_id}
-    resp = requests.get(url, params=params)
-    return resp.json()
+    try:
+        resp = requests.get(url, params=params, timeout=1)
+        return resp.json()
+    except requests.exceptions.RequestException:
+        return {}
 
 def check_membership(user_id):
     member = get_chat_member(CHANNEL, user_id)
@@ -60,14 +62,33 @@ def webhook():
 
         text = message.get("text", "")
 
-        # Handle /start command
         if text == "/start":
             if check_membership(user_id):
-                # User joined the channel
                 send_message(chat_id, "✅ Channel Joined Successfully!")
+                send_courses(chat_id)
+            else:
+                buttons = [["Join Channel"]]
+                send_message(chat_id, "📢 Please join the channel to access premium courses.", reply_markup=chat_keyboard(buttons))
 
-                # Send course list
-                courses_text = """📚 GxNSS COURSES
+        elif text == "Join Channel":
+            send_message(chat_id, f"Please join our channel: {CHANNEL}")
+
+        elif text == "Buy Now For ₹79":
+            upi_msg = """💳 Payment Details
+
+QR: https://mruser96.42web.io/qr.jpg
+UPI: 7219011336@fam
+
+SEND SS OF PAYMENT WITH YOUR TELEGRAM USERNAME"""
+            send_message(chat_id, upi_msg)
+
+        if "photo" in message:
+            handle_photo(chat_id, user_id, username, message["photo"])
+
+    return "OK"
+
+def send_courses(chat_id):
+    courses_text = """📚 GxNSS COURSES
 
 🔹 Programming Courses
 C++
@@ -104,42 +125,46 @@ Machine Learning
 Pro Music Production
 Photoshop CC
 (and many more…)"""
-                send_message(chat_id, courses_text)
+    send_message(chat_id, courses_text)
 
-                # Send offer with Buy button
-                offer_text = """🚀 Huge Course Bundle – Now Just ₹79! (Originally ₹199)
+    offer_text = """🚀 Huge Course Bundle – Now Just ₹79! (Originally ₹199)
 
 Get access to an enormous collection of high-value courses that work effectively — 99% guaranteed success!
 
 Don’t miss this incredible offer. Unlock all courses today for only ₹79 and save big!"""
-                buttons = [["Buy Now For ₹79"]]
-                send_message(chat_id, offer_text, reply_markup=chat_keyboard(buttons))
+    buttons = [["Buy Now For ₹79"]]
+    send_message(chat_id, offer_text, reply_markup=chat_keyboard(buttons))
 
-            else:
-                # User not joined → ask to join
-                buttons = [["Join Channel"]]
-                send_message(chat_id, "📢 Please join the channel to access premium courses.", reply_markup=chat_keyboard(buttons))
+def handle_photo(chat_id, user_id, username, photos):
+    file_id = photos[-1]["file_id"]
+    file_info = requests.get(f"{API_URL}/getFile", params={"file_id": file_id}, timeout=1).json()
+    file_path = file_info.get("result", {}).get("file_path", "")
+    if not file_path:
+        send_message(chat_id, "❌ Failed to upload screenshot.")
+        return
 
-        # Handle Buy Now click
-        elif text == "Buy Now For ₹79":
-            upi_msg = """💳 Payment Details
+    file_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path}"
+    file_content = requests.get(file_url, timeout=2).content
+    filename = f"{user_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}.jpg"
 
-QR: https://mruser96.42web.io/qr.jpg
-UPI: 7219011336@fam
+    supabase.storage.from_("screenshots").upload(filename, file_content)
 
-SEND SS OF PAYMENT WITH YOUR TELEGRAM USERNAME"""
-            send_message(chat_id, upi_msg)
+    public_url = f"{SUPABASE_URL}/storage/v1/object/public/screenshots/{filename}"
 
-        # Handle Join Channel click
-        elif text == "Join Channel":
-            send_message(chat_id, f"Please join our channel: {CHANNEL}")
+    supabase.table("payments").insert({
+        "chat_id": user_id,
+        "username": username,
+        "screenshot_url": public_url,
+        "status": "pending",
+        "created_at": datetime.now().isoformat()
+    }).execute()
 
-    return "OK"
+    send_message(chat_id, "✅ Screenshot uploaded! Our team will verify your payment soon.")
 
 @app.before_first_request
 def set_webhook():
-    requests.post(f"{API_URL}/setWebhook", json={"url": WEBHOOK_URL})
+    requests.post(f"{API_URL}/setWebhook", json={"url": WEBHOOK_URL}, timeout=1)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "5000"))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=port, debug=False)
