@@ -8,8 +8,7 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
-CHANNEL_1 = "@GxNSSgiveaway"
-CHANNEL_2 = "@GxNSSTOOLS"
+CHANNEL = "@GxNSSupdates"  # Only one channel now
 
 app = Flask(__name__)
 
@@ -39,29 +38,24 @@ def webhook():
         if text == "/start":
             keyboard = {
                 "inline_keyboard": [
-                    [{"text": "Join Channel 1", "url": "https://t.me/GxNSSgiveaway"}],
-                    [{"text": "Join Channel 2", "url": "https://t.me/GxNSSTOOLS"}],
+                    [{"text": "Join Channel", "url": "https://t.me/GxNSSupdates"}],
                     [{"text": "✅ Try Again", "callback_data": "check_join"}]
                 ]
             }
-            send_message(chat_id, "📢 Please join both channels to access premium courses.", reply_markup=keyboard)
+            send_message(chat_id, "📢 Please join the channel to access premium courses.", reply_markup=keyboard)
 
     if "callback_query" in data:
         query = data["callback_query"]
         user_id = query["from"]["id"]
         chat_id = query["message"]["chat"]["id"]
 
-        # Check if user is member in both channels
-        member1 = get_chat_member(CHANNEL_1, user_id)
-        member2 = get_chat_member(CHANNEL_2, user_id)
+        member = get_chat_member(CHANNEL, user_id)
+        status = member.get("result", {}).get("status", "")
 
-        status1 = member1.get("result", {}).get("status", "")
-        status2 = member2.get("result", {}).get("status", "")
-
-        if status1 in ["member", "administrator"] and status2 in ["member", "administrator"]:
-            send_message(chat_id, "✅ You have joined both channels! Now you can access premium courses.")
+        if status in ["member", "administrator"]:
+            send_message(chat_id, "✅ You have joined the channel! Now you can access premium courses.")
         else:
-            send_message(chat_id, "⚠ Please join both channels first!")
+            send_message(chat_id, "⚠ Please join the channel first!")
 
     return "OK"
 
