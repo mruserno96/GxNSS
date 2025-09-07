@@ -9,7 +9,7 @@ import telebot
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY")
 CHANNEL = os.getenv("CHANNEL")
 ADMINS = [8356178010, 1929429459]  # Replace with your actual Telegram IDs
 
