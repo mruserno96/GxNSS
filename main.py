@@ -12,7 +12,7 @@ API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 app = Flask(__name__)
 
-# Cache already verified users to speed up /start
+# Cache already verified users to speed up detection
 verified_users = set()
 
 # Messages
@@ -61,6 +61,7 @@ Get access to an enormous collection of high-value courses that work effectively
 Don’t miss this incredible offer. Unlock all courses today for only ₹79 and save big!
 """
 
+# Send a text message
 def send_message(chat_id, text, reply_markup=None):
     data = {
         "chat_id": chat_id,
@@ -71,12 +72,14 @@ def send_message(chat_id, text, reply_markup=None):
         data["reply_markup"] = reply_markup
     requests.post(f"{API_URL}/sendMessage", json=data)
 
+# Send a photo
 def send_photo(chat_id, photo_url):
     requests.post(f"{API_URL}/sendPhoto", json={
         "chat_id": chat_id,
         "photo": photo_url
     })
 
+# Fast channel membership check
 def get_chat_member(chat_id, user_id):
     try:
         resp = requests.get(f"{API_URL}/getChatMember", params={
@@ -99,6 +102,7 @@ def check_membership(user_id):
         return True
     return False
 
+# Webhook route
 @app.route("/", methods=["POST"])
 def webhook():
     data = request.get_json(force=True)
@@ -114,10 +118,10 @@ def webhook():
                 # Step 1: Channel joined
                 send_message(chat_id, "✅ Channel Joined Successfully!")
 
-                # Step 2: Courses
+                # Step 2: Courses list
                 send_message(chat_id, courses_text)
 
-                # Step 3: Bundle + inline button
+                # Step 3: Bundle + inline Buy Now button
                 keyboard = {
                     "inline_keyboard": [
                         [{"text": "Buy Now For ₹79", "callback_data": "buy_79"}]
@@ -125,6 +129,7 @@ def webhook():
                 }
                 send_message(chat_id, bundle_text, reply_markup=keyboard)
             else:
+                # Ask user to join channel
                 keyboard = {
                     "inline_keyboard": [
                         [{"text": "Join Channel", "url": f"https://t.me/{CHANNEL.strip('@')}"}],
@@ -142,8 +147,6 @@ def webhook():
         if query.get("data") == "check_join":
             if check_membership(user_id):
                 send_message(chat_id, "✅ Channel Joined Successfully!")
-
-                # Send course list + bundle
                 send_message(chat_id, courses_text)
                 keyboard = {
                     "inline_keyboard": [
@@ -155,12 +158,13 @@ def webhook():
                 send_message(chat_id, "⚠ Please join the channel first!")
 
         elif query.get("data") == "buy_79":
-            # Send QR + payment instructions
+            # Send QR + UPI instructions
             send_photo(chat_id, "https://mruser96.42web.io/qr.jpg")
             send_message(chat_id, "📌 UPI - 7219011336@fam\n\nSEND SS OF PAYMENT WITH YOUR TELEGRAM USERNAME")
 
     return "OK"
 
+# Set webhook
 @app.before_first_request
 def set_webhook():
     requests.post(f"{API_URL}/setWebhook", json={"url": WEBHOOK_URL})
