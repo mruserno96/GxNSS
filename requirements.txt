@@ -1,5 +1,4 @@
-
-Flask==2.3.4
+Flask==2.2.5
 requests==2.32.0
 python-dotenv==1.0.1
 supabase==3.37.0
