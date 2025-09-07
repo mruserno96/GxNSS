@@ -29,35 +29,43 @@ def get_chat_member(chat_id, user_id):
     resp = requests.get(url, params=params)
     return resp.json()
 
+def check_membership(user_id):
+    member = get_chat_member(CHANNEL, user_id)
+    status = member.get("result", {}).get("status", "")
+    return status in ["member", "administrator"]
+
 @app.route("/", methods=["POST"])
 def webhook():
     data = request.get_json(force=True)
 
     if "message" in data and "text" in data["message"]:
         chat_id = data["message"]["chat"]["id"]
+        user_id = data["message"]["from"]["id"]
         text = data["message"]["text"]
+
         if text == "/start":
-            keyboard = {
-                "inline_keyboard": [
-                    [{"text": "Join Channel", "url": "https://t.me/GxNSSupdates"}],
-                    [{"text": "✅ Try Again", "callback_data": "check_join"}]
-                ]
-            }
-            send_message(chat_id, "📢 Please join the channel to access premium courses.", reply_markup=keyboard)
+            # Check membership immediately
+            if check_membership(user_id):
+                send_message(chat_id, "✅ You have joined the channel! Now you can access premium courses.")
+            else:
+                keyboard = {
+                    "inline_keyboard": [
+                        [{"text": "Join Channel", "url": "https://t.me/GxNSSupdates"}],
+                        [{"text": "✅ Try Again", "callback_data": "check_join"}]
+                    ]
+                }
+                send_message(chat_id, "📢 Please join the channel to access premium courses.", reply_markup=keyboard)
 
     if "callback_query" in data:
         query = data["callback_query"]
         user_id = query["from"]["id"]
         chat_id = query["message"]["chat"]["id"]
 
-        # Check if user is a member of the channel
-        member = get_chat_member(CHANNEL, user_id)
-        status = member.get("result", {}).get("status", "")
-
-        if status in ["member", "administrator"]:
-            send_message(chat_id, "✅ You have joined the channel! Now you can access premium courses.")
-        else:
-            send_message(chat_id, "⚠ Please join the channel first!")
+        if query.get("data") == "check_join":
+            if check_membership(user_id):
+                send_message(chat_id, "✅ You have joined the channel! Now you can access premium courses.")
+            else:
+                send_message(chat_id, "⚠ Please join the channel first!")
 
     return "OK"
 
