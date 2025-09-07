@@ -16,7 +16,6 @@ app = Flask(__name__)
 bot = Bot(token=BOT_TOKEN)
 dispatcher = Dispatcher(bot, None, workers=0, use_context=True)
 
-# Setup webhook
 @app.before_first_request
 def set_webhook():
     bot.delete_webhook()
@@ -29,7 +28,6 @@ def webhook():
     dispatcher.process_update(update)
     return "OK"
 
-# /start command handler
 def start(update, context):
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("Join Channel 1", url="https://t.me/GxNSSgiveaway")],
@@ -38,7 +36,6 @@ def start(update, context):
     ])
     update.message.reply_text("📢 Please join both channels to access premium courses.", reply_markup=keyboard)
 
-# Check join callback
 def check_join(update, context):
     query = update.callback_query
     user_id = query.from_user.id
@@ -55,7 +52,6 @@ def check_join(update, context):
     else:
         query.answer("⚠ Please join both channels first!", show_alert=True)
 
-# Register handlers
 dispatcher.add_handler(CommandHandler("start", start))
 dispatcher.add_handler(CallbackQueryHandler(check_join, pattern="check_join"))
 
