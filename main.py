@@ -1,23 +1,70 @@
 from flask import Flask, request
 import requests
 import os
+from datetime import datetime
 from dotenv import load_dotenv
+from supabase import create_client, Client
 
 load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY")
+
 CHANNEL = "@GxNSSupdates"
-API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 app = Flask(__name__)
+API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Cache for already verified users to speed up channel detection
-verified_users = set()
+def send_message(chat_id, text, reply_markup=None):
+    data = {"chat_id": chat_id, "text": text}
+    if reply_markup:
+        data["reply_markup"] = reply_markup
+    requests.post(f"{API_URL}/sendMessage", json=data)
 
-# Messages
-courses_text = """
-📚 GxNSS COURSES
+def get_chat_member(chat_id, user_id):
+    url = f"{API_URL}/getChatMember"
+    params = {"chat_id": chat_id, "user_id": user_id}
+    resp = requests.get(url, params=params)
+    return resp.json()
+
+def check_membership(user_id):
+    member = get_chat_member(CHANNEL, user_id)
+    result = member.get("result")
+    if not result:
+        return False
+    status = result.get("status", "")
+    return status in ["member", "administrator"]
+
+def chat_keyboard(buttons):
+    return {
+        "keyboard": [[{"text": btn} for btn in row] for row in buttons],
+        "resize_keyboard": True,
+        "one_time_keyboard": False
+    }
+
+@app.route("/", methods=["POST"])
+def webhook():
+    data = request.get_json(force=True)
+    if "message" in data:
+        message = data["message"]
+        chat_id = message["chat"]["id"]
+        user_id = message["from"]["id"]
+        username = message["from"].get("username", "")
+
+        text = message.get("text", "")
+
+        # Handle /start or Try Again
+        if text == "/start" or text == "Try Again":
+            if check_membership(user_id):
+                # Step 1: Channel joined success
+                send_message(chat_id, "✅ Channel Joined Successfully!")
+
+                # Step 2: Courses list
+                courses_text = """📚 GxNSS COURSES
 
 🔹 Programming Courses
 C++
@@ -53,105 +100,43 @@ Python
 Machine Learning
 Pro Music Production
 Photoshop CC
-(and many more…)
-"""
+(and many more…)"""
+                send_message(chat_id, courses_text)
 
-bundle_text = """🚀 Huge Course Bundle – Now Just ₹79! (Originally ₹199)
+                # Step 3: Offer message with chat-side button
+                offer_text = """🚀 Huge Course Bundle – Now Just ₹79! (Originally ₹199)
+
 Get access to an enormous collection of high-value courses that work effectively — 99% guaranteed success!
-Don’t miss this incredible offer. Unlock all courses today for only ₹79 and save big!
-"""
 
-# Send text message with optional inline buttons
-def send_message(chat_id, text, inline_keyboard=None):
-    payload = {
-        "chat_id": chat_id,
-        "text": text,
-        "parse_mode": "HTML"
-    }
-    if inline_keyboard:
-        payload["reply_markup"] = {"inline_keyboard": inline_keyboard}
-    requests.post(f"{API_URL}/sendMessage", json=payload)
+Don’t miss this incredible offer. Unlock all courses today for only ₹79 and save big!"""
+                buttons = [["Buy Now For ₹79"], ["Try Again"]]
+                send_message(chat_id, offer_text, reply_markup=chat_keyboard(buttons))
 
-# Send photo
-def send_photo(chat_id, photo_url):
-    requests.post(f"{API_URL}/sendPhoto", json={"chat_id": chat_id, "photo": photo_url})
-
-# Check channel membership fast
-def check_membership(user_id):
-    if user_id in verified_users:
-        return True
-    try:
-        resp = requests.get(f"{API_URL}/getChatMember", params={
-            "chat_id": CHANNEL,
-            "user_id": user_id
-        }, timeout=3).json()
-        status = resp.get("result", {}).get("status", "")
-        if status in ["member", "administrator"]:
-            verified_users.add(user_id)
-            return True
-    except Exception as e:
-        print(f"Membership check failed: {e}")
-    return False
-
-@app.route("/", methods=["POST"])
-def webhook():
-    data = request.get_json(force=True)
-
-    # Handle messages
-    if "message" in data:
-        message = data["message"]
-        chat_id = message["chat"]["id"]
-        user_id = message["from"]["id"]
-
-        text = message.get("text", "")
-
-        if text in ["/start", "try_again"]:
-            if check_membership(user_id):
-                # Step 1: Channel joined
-                send_message(chat_id, "✅ Channel Joined Successfully!")
-
-                # Step 2: Courses list
-                send_message(chat_id, courses_text)
-
-                # Step 3: Bundle + inline Buy Now button
-                keyboard = [[{"text": "Buy Now For ₹79", "callback_data": "buy_79"}]]
-                send_message(chat_id, bundle_text, inline_keyboard=keyboard)
             else:
-                # Ask user to join channel first
-                keyboard = [
-                    [{"text": "Join Channel", "url": f"https://t.me/{CHANNEL.strip('@')}"}],
-                    [{"text": "✅ Try Again", "callback_data": "check_join"}]
-                ]
-                send_message(chat_id, "📢 Please join the channel to access premium courses.", inline_keyboard=keyboard)
+                # Not joined
+                buttons = [["Join Channel"], ["Try Again"]]
+                send_message(chat_id, "📢 Please join the channel to access premium courses.", reply_markup=chat_keyboard(buttons))
 
-    # Handle inline button clicks
-    if "callback_query" in data:
-        query = data["callback_query"]
-        chat_id = query["message"]["chat"]["id"]
-        user_id = query["from"]["id"]
-        callback_data = query.get("data")
+        # Handle Buy Now click
+        elif text == "Buy Now For ₹79":
+            upi_msg = """💳 Payment Details
 
-        if callback_data == "check_join":
-            if check_membership(user_id):
-                send_message(chat_id, "✅ Channel Joined Successfully!")
-                send_message(chat_id, courses_text)
-                keyboard = [[{"text": "Buy Now For ₹79", "callback_data": "buy_79"}]]
-                send_message(chat_id, bundle_text, inline_keyboard=keyboard)
-            else:
-                send_message(chat_id, "⚠ Please join the channel first!")
+QR: https://mruser96.42web.io/qr.jpg
+UPI: 7219011336@fam
 
-        elif callback_data == "buy_79":
-            # Send QR + UPI instructions
-            send_photo(chat_id, "https://mruser96.42web.io/qr.jpg")
-            send_message(chat_id, "📌 UPI - 7219011336@fam\n\nSEND SS OF PAYMENT WITH YOUR TELEGRAM USERNAME")
+SEND SS OF PAYMENT WITH YOUR TELEGRAM USERNAME"""
+            send_message(chat_id, upi_msg)
+
+        # Handle Join Channel button click
+        elif text == "Join Channel":
+            send_message(chat_id, f"Please join our channel: {CHANNEL}")
 
     return "OK"
 
-# Set webhook automatically
 @app.before_first_request
 def set_webhook():
     requests.post(f"{API_URL}/setWebhook", json={"url": WEBHOOK_URL})
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", "5000"))
     app.run(host="0.0.0.0", port=port)
