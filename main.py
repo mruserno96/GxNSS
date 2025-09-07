@@ -31,7 +31,10 @@ def get_chat_member(chat_id, user_id):
 
 def check_membership(user_id):
     member = get_chat_member(CHANNEL, user_id)
-    status = member.get("result", {}).get("status", "")
+    result = member.get("result")
+    if not result:
+        return False
+    status = result.get("status", "")
     return status in ["member", "administrator"]
 
 @app.route("/", methods=["POST"])
@@ -44,7 +47,6 @@ def webhook():
         text = data["message"]["text"]
 
         if text == "/start":
-            # Check membership immediately
             if check_membership(user_id):
                 send_message(chat_id, "✅ You have joined the channel! Now you can access premium courses.")
             else:
