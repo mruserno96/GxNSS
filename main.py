@@ -12,7 +12,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY")
-CHANNEL = os.getenv("CHANNEL")  # e.g., "@YourChannelUsername"
+CHANNEL = os.getenv("CHANNEL")  # Example: "@YourChannelUsername"
 ADMINS = [8356178010, 1929429459]  # Admin Telegram IDs
 
 # ---------------- Initialize ----------------
@@ -20,7 +20,7 @@ app = Flask(__name__)
 API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# ---------------- Telegram Helpers ----------------
+# ---------------- Telegram Helper Functions ----------------
 def send_message(chat_id, text, reply_markup=None):
     data = {
         "chat_id": chat_id,
@@ -31,6 +31,7 @@ def send_message(chat_id, text, reply_markup=None):
         data["reply_markup"] = reply_markup
     response = requests.post(f"{API_URL}/sendMessage", json=data)
     print("send_message response:", response.json())
+    return response
 
 def send_photo(chat_id, photo_url, caption=None):
     data = {
@@ -42,13 +43,14 @@ def send_photo(chat_id, photo_url, caption=None):
         data["parse_mode"] = "Markdown"
     response = requests.post(f"{API_URL}/sendPhoto", json=data)
     print("send_photo response:", response.json())
+    return response
 
 def get_chat_member(chat_id, user_id):
     url = f"{API_URL}/getChatMember"
     params = {"chat_id": chat_id, "user_id": user_id}
-    response = requests.get(url, params=params)
-    print("get_chat_member response:", response.json())
-    return response.json()
+    resp = requests.get(url, params=params)
+    print("get_chat_member response:", resp.json())
+    return resp.json()
 
 def check_membership(user_id):
     result = get_chat_member(CHANNEL, user_id).get("result")
@@ -134,31 +136,31 @@ def webhook():
         user_id = message["from"]["id"]
         username = message["from"].get("username", "")
 
-        # ---------------- Admin Commands ----------------
         if user_id in ADMINS and message.get("text") == "/start":
             keyboard = build_keyboard(["Help", "View Payments", "View Premium Users"])
             send_message(chat_id, "👋 Hello Admin! Choose an option.", keyboard)
             return "OK"
 
         if user_id in ADMINS and message.get("text") == "Help":
-            send_message(chat_id, "/start - Restart bot\nView Payments - See pending payments\nView Premium Users - See all premium users")
+            help_text = "/start - Restart bot\nView Payments - See pending payments\nView Premium Users - See all premium users"
+            send_message(chat_id, help_text)
             return "OK"
 
         if user_id in ADMINS and message.get("text") == "View Payments":
             payments = supabase.table("payments").select("*").eq("status", "pending").execute()
-            lines = [f"Chat ID: {p['chat_id']}\nUsername: @{p['username'] or 'N/A'}" for p in payments.data]
-            text = "\n\n".join(lines) if lines else "No pending payments."
+            lines = [f"Chat ID: {p['chat_id']}\nUsername: @{p['username'] or 'N/A'}\n" for p in payments.data]
+            text = "\n".join(lines) if lines else "No pending payments."
             send_message(chat_id, text)
             return "OK"
 
         if user_id in ADMINS and message.get("text") == "View Premium Users":
             payments = supabase.table("payments").select("*").eq("status", "premium").execute()
-            lines = [f"Chat ID: {p['chat_id']}\nUsername: @{p['username'] or 'N/A'}" for p in payments.data]
-            text = "\n\n".join(lines) if lines else "No premium users."
+            lines = [f"Chat ID: {p['chat_id']}\nUsername: @{p['username'] or 'N/A'}\n" for p in payments.data]
+            text = "\n".join(lines) if lines else "No premium users."
             send_message(chat_id, text)
             return "OK"
 
-        # ---------------- User Commands ----------------
+        # Handle User /start
         if message.get("text") == "/start":
             if is_premium(user_id):
                 send_message(chat_id, "✅ Welcome back Premium User!")
@@ -193,38 +195,37 @@ def webhook():
             send_message(chat_id, get_upi_text())
             return "OK"
 
-        # ---------------- Handle Payment Screenshot ----------------
         if "photo" in message:
-            file_id = message["photo"][-1]["file_id"]
-            file_info = requests.get(f"{API_URL}/getFile", params={"file_id": file_id}).json()
-            print("file_info:", file_info)
-            file_path = file_info["result"]["file_path"]
-            file_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path}"
-            file_content = requests.get(file_url).content
-            filename = f"{user_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}.jpg"
-
-            # Upload to Supabase storage
             try:
-                supabase.storage.from_("screenshots").upload(filename, file_content)
+                file_id = message["photo"][-1]["file_id"]
+                file_info = requests.get(f"{API_URL}/getFile", params={"file_id": file_id}).json()
+                file_path = file_info["result"]["file_path"]
+                file_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path}"
+                file_content = requests.get(file_url).content
+                filename = f"{user_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}.jpg"
+
+                # Upload to Supabase Storage (RLS disabled)
+                storage = supabase.storage.from_("screenshots")
+                result = storage.upload(filename, file_content)
+                print("Upload result:", result)
+
                 public_url = f"{SUPABASE_URL}/storage/v1/object/public/screenshots/{filename}"
-                print("Upload successful:", public_url)
-            except Exception as e:
-                public_url = ""
-                print("Storage upload error:", e)
 
-            # Insert into payments table
-            try:
-                supabase.table("payments").insert({
+                # Insert into payments table
+                res = supabase.table("payments").insert({
                     "chat_id": user_id,
                     "username": username,
                     "screenshot_url": public_url,
                     "status": "pending",
                     "created_at": datetime.now().isoformat()
                 }).execute()
+                print("Insert result:", res)
+
                 send_message(chat_id, "✅ Screenshot uploaded! Our team will verify your payment.")
             except Exception as e:
-                print("Insert error:", e)
+                print("Error handling photo:", e)
                 send_message(chat_id, "❌ Failed to upload screenshot. Please try again.")
+
             return "OK"
 
     return "OK"
@@ -243,5 +244,4 @@ def set_webhook():
 # ---------------- Run Flask ----------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "5000"))
-    print(f"Starting Flask app on port {port}")
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=port, debug=True)
