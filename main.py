@@ -12,14 +12,15 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY")
-CHANNEL = os.getenv("CHANNEL")  # e.g., "@YourChannelUsername"
+CHANNEL = os.getenv("CHANNEL")  # Example: "@YourChannelUsername"
 ADMINS = [8356178010, 1929429459]  # Admin Telegram IDs
 
+# ---------------- Initialize ----------------
 app = Flask(__name__)
 API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# ---------------- Telegram Helpers ----------------
+# ---------------- Telegram Helper Functions ----------------
 def send_message(chat_id, text, reply_markup=None):
     data = {
         "chat_id": chat_id,
@@ -51,6 +52,12 @@ def check_membership(user_id):
     if not result:
         return False
     return result.get("status") in ["member", "administrator"]
+
+def is_premium(user_id):
+    res = supabase.table("payments").select("status").eq("chat_id", user_id).execute()
+    if res.data and res.data[0]["status"] == "premium":
+        return True
+    return False
 
 def build_keyboard(button_list):
     keyboard = {
@@ -111,7 +118,7 @@ def get_upi_text():
 
 Send a screenshot of your payment with your Telegram username below. We will verify and upgrade your account to premium."""
 
-# ---------------- Webhook ----------------
+# ---------------- Webhook Route ----------------
 @app.route("/", methods=["POST"])
 def webhook():
     data = request.get_json(force=True)
@@ -121,14 +128,14 @@ def webhook():
         user_id = message["from"]["id"]
         username = message["from"].get("username", "")
 
-        # ---------------- Admin commands ----------------
+        # ---------------- Admin Commands ----------------
         if user_id in ADMINS and message.get("text") == "/start":
             keyboard = build_keyboard(["Help", "View Payments", "View Premium Users"])
             send_message(chat_id, "👋 Hello Admin! Choose an option.", keyboard)
             return "OK"
 
         if user_id in ADMINS and message.get("text") == "Help":
-            help_text = "/start - Restart bot\nView Payments - Pending payment requests\nView Premium Users - All premium users"
+            help_text = "/start - Restart bot\nView Payments - See pending payments\nView Premium Users - See all premium users"
             send_message(chat_id, help_text)
             return "OK"
 
@@ -146,9 +153,12 @@ def webhook():
             send_message(chat_id, text)
             return "OK"
 
-        # ---------------- User start ----------------
+        # ---------------- User Commands ----------------
         if message.get("text") == "/start":
-            if check_membership(user_id):
+            if is_premium(user_id):
+                send_message(chat_id, "✅ Welcome back Premium User!")
+                send_message(chat_id, get_courses_text())
+            elif check_membership(user_id):
                 send_message(chat_id, "✅ Channel Joined Successfully!")
                 send_message(chat_id, get_courses_text(), build_keyboard(["Buy Now For ₹79"]))
                 send_message(chat_id, get_offer_text())
@@ -156,14 +166,16 @@ def webhook():
                 send_message(chat_id, "⚠ Please join the channel to access premium courses.", build_keyboard(["Join Channel", "Try Again"]))
             return "OK"
 
-        # ---------------- Join / Try Again buttons ----------------
         if message.get("text") == "Join Channel":
             url = f"https://t.me/{CHANNEL.strip('@')}"
             send_message(chat_id, f"🔗 Please join here: {url}")
             return "OK"
 
         if message.get("text") == "Try Again":
-            if check_membership(user_id):
+            if is_premium(user_id):
+                send_message(chat_id, "✅ Welcome back Premium User!")
+                send_message(chat_id, get_courses_text())
+            elif check_membership(user_id):
                 send_message(chat_id, "✅ Channel Joined Successfully!")
                 send_message(chat_id, get_courses_text(), build_keyboard(["Buy Now For ₹79"]))
                 send_message(chat_id, get_offer_text())
@@ -171,7 +183,6 @@ def webhook():
                 send_message(chat_id, "⚠ Still not a member. Please join and try again.", build_keyboard(["Join Channel", "Try Again"]))
             return "OK"
 
-        # ---------------- Buy Now ----------------
         if message.get("text") == "Buy Now For ₹79":
             send_photo(chat_id, "https://mruser96.42web.io/qr.jpg")
             send_message(chat_id, get_upi_text())
@@ -186,7 +197,7 @@ def webhook():
             file_content = requests.get(file_url).content
             filename = f"{user_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}.jpg"
 
-            # Upload to Supabase storage
+            # Upload to Supabase Storage
             try:
                 supabase.storage.from_("screenshots").upload(filename, file_content)
                 public_url = f"{SUPABASE_URL}/storage/v1/object/public/screenshots/{filename}"
@@ -222,4 +233,4 @@ def set_webhook():
 # ---------------- Run Flask ----------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "5000"))
-    app.run(host="0.0.0.0", port=port)
+    app
