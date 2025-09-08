@@ -3,241 +3,183 @@ from datetime import datetime
 import requests
 from flask import Flask, request
 from dotenv import load_dotenv
-from supabase import create_client, Client
+from appwrite.client import Client
+from appwrite.services.databases import Databases
+from appwrite.services.storage import Storage
+from appwrite.input_file import InputFile
+from appwrite.id import ID
+from appwrite.query import Query
 
-# ---------------- Load environment variables ----------------
+# ---------------- Load env ----------------
 load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY")
-CHANNEL = os.getenv("CHANNEL")  # Example: "@YourChannelUsername"
-ADMINS = [8356178010, 1929429459]  # Replace with actual admin Telegram IDs
+APPWRITE_URL = os.getenv("APPWRITE_URL")
+APPWRITE_PROJECT = os.getenv("APPWRITE_PROJECT")
+APPWRITE_API_KEY = os.getenv("APPWRITE_API_KEY")
+DB_ID = os.getenv("APPWRITE_DB_ID")
+COLLECTION_ID = os.getenv("APPWRITE_COLLECTION_ID")
+BUCKET_ID = os.getenv("APPWRITE_BUCKET_ID")
+CHANNEL = os.getenv("CHANNEL")
+ADMINS = [8356178010, 1929429459]
 
-# ---------------- Initialize ----------------
+# ---------------- Init ----------------
 app = Flask(__name__)
 API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# ---------------- Telegram Helper Functions ----------------
+client = Client()
+client.set_endpoint(APPWRITE_URL).set_project(APPWRITE_PROJECT).set_key(APPWRITE_API_KEY)
+
+databases = Databases(client)
+storage = Storage(client)
+
+# ---------------- Telegram Helpers ----------------
 def send_message(chat_id, text, reply_markup=None):
-    data = {
-        "chat_id": chat_id,
-        "text": text,
-        "parse_mode": "Markdown"
-    }
+    data = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
     if reply_markup:
         data["reply_markup"] = reply_markup
-    resp = requests.post(f"{API_URL}/sendMessage", json=data)
-    print("send_message response:", resp.json())
-    return resp.json()
+    return requests.post(f"{API_URL}/sendMessage", json=data).json()
 
 def send_photo(chat_id, photo_url, caption=None):
-    data = {
-        "chat_id": chat_id,
-        "photo": photo_url,
-    }
+    data = {"chat_id": chat_id, "photo": photo_url}
     if caption:
         data["caption"] = caption
         data["parse_mode"] = "Markdown"
-    resp = requests.post(f"{API_URL}/sendPhoto", json=data)
-    print("send_photo response:", resp.json())
-    return resp.json()
+    return requests.post(f"{API_URL}/sendPhoto", json=data).json()
 
 def get_chat_member(chat_id, user_id):
     url = f"{API_URL}/getChatMember"
-    params = {"chat_id": chat_id, "user_id": user_id}
-    resp = requests.get(url, params=params)
-    print("get_chat_member response:", resp.json())
-    return resp.json()
+    return requests.get(url, params={"chat_id": chat_id, "user_id": user_id}).json()
 
 def check_membership(user_id):
     result = get_chat_member(CHANNEL, user_id).get("result")
-    if not result:
-        return False
-    return result.get("status") in ["member", "administrator"]
+    return result and result.get("status") in ["member", "administrator"]
 
 def is_premium(user_id):
-    res = supabase.table("payments").select("status").eq("chat_id", user_id).execute()
-    print("is_premium response:", res.data)
-    if res.data and res.data[0]["status"] == "premium":
-        return True
-    return False
+    payments = databases.list_documents(
+        DB_ID,
+        COLLECTION_ID,
+        [Query.equal("chat_id", user_id), Query.equal("status", "premium")]
+    )
+    return len(payments["documents"]) > 0
 
 def build_keyboard(button_list):
-    keyboard = {
-        "keyboard": [[btn] for btn in button_list],
-        "resize_keyboard": True,
-        "one_time_keyboard": False
-    }
-    return keyboard
+    return {"keyboard": [[btn] for btn in button_list], "resize_keyboard": True, "one_time_keyboard": False}
 
+# ---------------- Static Texts ----------------
 def get_courses_text():
-    return """📚 *GxNSS COURSES*
-
-🔹 Programming Courses
-C++
-Java
-JavaScript
-Python
-
-🔹 Hacking & Cybersecurity Courses
-BlackHat Hacking
-Ethical Hacking
-Android Hacking
-WiFi Hacking
-Binning (by BlackHat)
-Antivirus Development
-Phishing App Development
-PUBG Hack Development
-APK Modding (20+ Courses)
-
-🔹 System & OS Courses
-Linux
-PowerShell
-
-🔹 Special Cyber Tools Courses
-How to Make Telegram Number
-How to Make Lifetime RDP
-How to Call Any Indian Number Free
-How to Make Own SMS Bomber
-How to Make Own Temporary Mail Bot
-
-🔹 Premium Courses Bundle (31 Paid Courses)
-Cyber Security
-Python
-Machine Learning
-Pro Music Production
-Photoshop CC
-(and many more…)"""
+    return "📚 GxNSS COURSES\n(Your course list here…)"
 
 def get_offer_text():
-    return """🚀 *Huge Course Bundle – Now Just ₹79!* (Originally ₹199)
-
-Get access to an enormous collection of high-value courses that work effectively — 99% guaranteed success!
-
-Don’t miss this incredible offer. Unlock all courses today for only ₹79 and save big!"""
+    return "🚀 Huge Course Bundle – Now Just ₹79! (Originally ₹199)\nGet all courses today for only ₹79!"
 
 def get_upi_text():
-    return """💳 *UPI ID:* `7219011336@fam`
+    return "💳 UPI ID: 7219011336@fam\nSend a screenshot of your payment with your Telegram username."
 
-Send a screenshot of your payment with your Telegram username below. We will verify and upgrade your account to premium."""
-
-# ---------------- Webhook Route ----------------
+# ---------------- Webhook ----------------
 @app.route("/", methods=["POST"])
 def webhook():
     try:
         data = request.get_json(force=True)
-        print("Incoming data:", data)
+        if "message" not in data:
+            return "OK"
 
-        if "message" in data:
-            message = data["message"]
-            chat_id = message["chat"]["id"]
-            user_id = message["from"]["id"]
-            username = message["from"].get("username", "")
+        message = data["message"]
+        chat_id = message["chat"]["id"]
+        user_id = message["from"]["id"]
+        username = message["from"].get("username", "")
 
-            # ---------------- Admin Commands ----------------
-            if user_id in ADMINS and message.get("text") == "/start":
-                keyboard = build_keyboard(["Help", "View Payments", "View Premium Users"])
-                send_message(chat_id, "👋 Hello Admin! Choose an option.", keyboard)
-                return "OK"
+        # ----- Admin -----
+        if user_id in ADMINS:
+            text = message.get("text", "")
+            if text == "/start":
+                send_message(chat_id, "👋 Hello Admin!", build_keyboard(["Help", "View Payments", "View Premium Users"]))
+            elif text == "Help":
+                send_message(chat_id, "/start - Restart bot\nView Payments - Pending\nView Premium Users - Premium list")
+            elif text == "View Payments":
+                payments = databases.list_documents(DB_ID, COLLECTION_ID, [Query.equal("status", "pending")])
+                lines = [f"Chat ID: {p['chat_id']}\nUsername: @{p.get('username','N/A')}" for p in payments["documents"]]
+                send_message(chat_id, "\n".join(lines) if lines else "No pending payments.")
+            elif text == "View Premium Users":
+                payments = databases.list_documents(DB_ID, COLLECTION_ID, [Query.equal("status", "premium")])
+                lines = [f"Chat ID: {p['chat_id']}\nUsername: @{p.get('username','N/A')}" for p in payments["documents"]]
+                send_message(chat_id, "\n".join(lines) if lines else "No premium users.")
+            return "OK"
 
-            if user_id in ADMINS and message.get("text") == "Help":
-                help_text = "/start - Restart bot\nView Payments - See pending payments\nView Premium Users - See all premium users"
-                send_message(chat_id, help_text)
-                return "OK"
+        # ----- User -----
+        text = message.get("text", "")
+        if text == "/start":
+            if is_premium(user_id):
+                send_message(chat_id, "✅ Welcome back Premium User!")
+                send_message(chat_id, get_courses_text())
+            elif check_membership(user_id):
+                send_message(chat_id, "✅ Channel Joined Successfully!")
+                send_message(chat_id, get_courses_text(), build_keyboard(["Buy Now For ₹79"]))
+                send_message(chat_id, get_offer_text())
+            else:
+                send_message(chat_id, "⚠ Please join the channel first.", build_keyboard(["Join Channel", "Try Again"]))
+            return "OK"
 
-            if user_id in ADMINS and message.get("text") == "View Payments":
-                payments = supabase.table("payments").select("*").eq("status", "pending").execute()
-                lines = [f"Chat ID: {p['chat_id']}\nUsername: @{p['username'] or 'N/A'}\n" for p in payments.data]
-                text = "\n".join(lines) if lines else "No pending payments."
-                send_message(chat_id, text)
-                return "OK"
+        if text == "Join Channel":
+            send_message(chat_id, f"🔗 Join here: https://t.me/{CHANNEL.strip('@')}")
+            return "OK"
 
-            if user_id in ADMINS and message.get("text") == "View Premium Users":
-                payments = supabase.table("payments").select("*").eq("status", "premium").execute()
-                lines = [f"Chat ID: {p['chat_id']}\nUsername: @{p['username'] or 'N/A'}\n" for p in payments.data]
-                text = "\n".join(lines) if lines else "No premium users."
-                send_message(chat_id, text)
-                return "OK"
+        if text == "Try Again":
+            if is_premium(user_id):
+                send_message(chat_id, "✅ Welcome back Premium User!")
+                send_message(chat_id, get_courses_text())
+            elif check_membership(user_id):
+                send_message(chat_id, "✅ Channel Joined Successfully!")
+                send_message(chat_id, get_courses_text(), build_keyboard(["Buy Now For ₹79"]))
+                send_message(chat_id, get_offer_text())
+            else:
+                send_message(chat_id, "⚠ Still not a member.", build_keyboard(["Join Channel", "Try Again"]))
+            return "OK"
 
-            # ---------------- User Commands ----------------
-            if message.get("text") == "/start":
-                if is_premium(user_id):
-                    send_message(chat_id, "✅ Welcome back Premium User!")
-                    send_message(chat_id, get_courses_text())
-                elif check_membership(user_id):
-                    send_message(chat_id, "✅ Channel Joined Successfully!")
-                    send_message(chat_id, get_courses_text(), build_keyboard(["Buy Now For ₹79"]))
-                    send_message(chat_id, get_offer_text())
-                else:
-                    send_message(chat_id, "⚠ Please join the channel to access premium courses.", build_keyboard(["Join Channel", "Try Again"]))
-                return "OK"
+        if text == "Buy Now For ₹79":
+            send_photo(chat_id, "https://mruser96.42web.io/qr.jpg")
+            send_message(chat_id, get_upi_text())
+            return "OK"
 
-            if message.get("text") == "Join Channel":
-                url = f"https://t.me/{CHANNEL.strip('@')}"
-                send_message(chat_id, f"🔗 Please join here: {url}")
-                return "OK"
+        # ----- Payment Screenshot -----
+        if "photo" in message:
+            try:
+                file_id = message["photo"][-1]["file_id"]
+                file_info = requests.get(f"{API_URL}/getFile", params={"file_id": file_id}).json()
+                file_path = file_info["result"]["file_path"]
+                file_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path}"
+                file_content = requests.get(file_url).content
+                filename = f"{user_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}.jpg"
 
-            if message.get("text") == "Try Again":
-                if is_premium(user_id):
-                    send_message(chat_id, "✅ Welcome back Premium User!")
-                    send_message(chat_id, get_courses_text())
-                elif check_membership(user_id):
-                    send_message(chat_id, "✅ Channel Joined Successfully!")
-                    send_message(chat_id, get_courses_text(), build_keyboard(["Buy Now For ₹79"]))
-                    send_message(chat_id, get_offer_text())
-                else:
-                    send_message(chat_id, "⚠ Still not a member. Please join and try again.", build_keyboard(["Join Channel", "Try Again"]))
-                return "OK"
+                # Upload to Appwrite Storage
+                result = storage.create_file(
+                    BUCKET_ID,
+                    ID.unique(),
+                    InputFile.from_bytes(file_content, filename)
+                )
+                public_url = f"{APPWRITE_URL}/storage/buckets/{BUCKET_ID}/files/{result['$id']}/view?project={APPWRITE_PROJECT}"
 
-            if message.get("text") == "Buy Now For ₹79":
-                send_photo(chat_id, "https://mruser96.42web.io/qr.jpg")
-                send_message(chat_id, get_upi_text())
-                return "OK"
-
-            # ---------------- Handle Payment Screenshot ----------------
-            if "photo" in message:
-                try:
-                    file_id = message["photo"][-1]["file_id"]
-                    file_info = requests.get(f"{API_URL}/getFile", params={"file_id": file_id}).json()
-                    file_path = file_info["result"]["file_path"]
-                    file_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path}"
-                    file_content = requests.get(file_url).content
-                    filename = f"{user_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}.jpg"
-
-                    # Upload to Supabase Storage
-                    storage = supabase.storage.from_("screenshots")
-                    result = storage.upload(filename, file_content)
-                    print("Upload result:", result)
-
-                    public_url = f"{SUPABASE_URL}/storage/v1/object/public/screenshots/{filename}"
-
-                    # Insert into payments table
-                    res = supabase.table("payments").insert({
+                # Insert DB record
+                databases.create_document(
+                    DB_ID,
+                    COLLECTION_ID,
+                    ID.unique(),
+                    {
                         "chat_id": user_id,
                         "username": username,
                         "screenshot_url": public_url,
                         "status": "pending",
-                        "created_at": datetime.now().isoformat()
-                    }).execute()
-                    print("Insert result:", res)
-
-                    if res.error:
-                        print("Insert error:", res.error)
-                        send_message(chat_id, "❌ Failed to record payment. Please try again.")
-                    else:
-                        send_message(chat_id, "✅ Screenshot uploaded! Our team will verify your payment.")
-
-                except Exception as e:
-                    print("Error handling photo:", e)
-                    send_message(chat_id, "❌ Failed to upload screenshot. Please try again.")
-
-                return "OK"
+                        "created_at": datetime.utcnow().isoformat()
+                    }
+                )
+                send_message(chat_id, "✅ Screenshot uploaded! We will verify your payment.")
+            except Exception as e:
+                print("Error handling photo:", e)
+                send_message(chat_id, "❌ Failed to upload screenshot. Please try again.")
+            return "OK"
 
         return "OK"
-
     except Exception as e:
         print("Webhook error:", e)
         return "OK"
