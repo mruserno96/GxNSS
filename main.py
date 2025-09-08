@@ -197,7 +197,6 @@ def webhook():
             file_content = requests.get(file_url).content
             filename = f"{user_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}.jpg"
 
-            # Upload to Supabase Storage
             try:
                 supabase.storage.from_("screenshots").upload(filename, file_content)
                 public_url = f"{SUPABASE_URL}/storage/v1/object/public/screenshots/{filename}"
@@ -205,7 +204,6 @@ def webhook():
                 public_url = ""
                 print("Storage upload error:", e)
 
-            # Insert into payments table
             supabase.table("payments").insert({
                 "chat_id": user_id,
                 "username": username,
@@ -233,4 +231,4 @@ def set_webhook():
 # ---------------- Run Flask ----------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "5000"))
-    app
+    app.run(host="0.0.0.0", port=port)
