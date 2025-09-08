@@ -12,8 +12,8 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY")
-CHANNEL = os.getenv("CHANNEL")  # e.g., "@YourChannel"
-ADMINS = [8356178010, 1929429459]
+CHANNEL = os.getenv("CHANNEL")  # e.g., "@YourChannelUsername"
+ADMINS = [8356178010, 1929429459]  # Admin Telegram IDs
 
 app = Flask(__name__)
 API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
@@ -29,6 +29,16 @@ def send_message(chat_id, text, reply_markup=None):
     if reply_markup:
         data["reply_markup"] = reply_markup
     requests.post(f"{API_URL}/sendMessage", json=data)
+
+def send_photo(chat_id, photo_url, caption=None):
+    data = {
+        "chat_id": chat_id,
+        "photo": photo_url,
+    }
+    if caption:
+        data["caption"] = caption
+        data["parse_mode"] = "Markdown"
+    requests.post(f"{API_URL}/sendPhoto", json=data)
 
 def get_chat_member(chat_id, user_id):
     url = f"{API_URL}/getChatMember"
@@ -51,7 +61,7 @@ def build_keyboard(button_list):
     return keyboard
 
 def get_courses_text():
-    return """📚 GxNSS COURSES
+    return """📚 *GxNSS COURSES*
 
 🔹 Programming Courses
 C++
@@ -89,27 +99,64 @@ Pro Music Production
 Photoshop CC
 (and many more…)"""
 
-# ---------------- Webhook route ----------------
+def get_offer_text():
+    return """🚀 *Huge Course Bundle – Now Just ₹79!* (Originally ₹199)
+
+Get access to an enormous collection of high-value courses that work effectively — 99% guaranteed success!
+
+Don’t miss this incredible offer. Unlock all courses today for only ₹79 and save big!"""
+
+def get_upi_text():
+    return """💳 *UPI ID:* `7219011336@fam`
+
+Send a screenshot of your payment with your Telegram username below. We will verify and upgrade your account to premium."""
+
+# ---------------- Webhook ----------------
 @app.route("/", methods=["POST"])
 def webhook():
     data = request.get_json(force=True)
-
     if "message" in data:
         message = data["message"]
         chat_id = message["chat"]["id"]
         user_id = message["from"]["id"]
         username = message["from"].get("username", "")
 
+        # ---------------- Admin commands ----------------
+        if user_id in ADMINS and message.get("text") == "/start":
+            keyboard = build_keyboard(["Help", "View Payments", "View Premium Users"])
+            send_message(chat_id, "👋 Hello Admin! Choose an option.", keyboard)
+            return "OK"
+
+        if user_id in ADMINS and message.get("text") == "Help":
+            help_text = "/start - Restart bot\nView Payments - Pending payment requests\nView Premium Users - All premium users"
+            send_message(chat_id, help_text)
+            return "OK"
+
+        if user_id in ADMINS and message.get("text") == "View Payments":
+            payments = supabase.table("payments").select("*").eq("status", "pending").execute()
+            lines = [f"Chat ID: {p['chat_id']}\nUsername: @{p['username'] or 'N/A'}\n" for p in payments.data]
+            text = "\n".join(lines) if lines else "No pending payments."
+            send_message(chat_id, text)
+            return "OK"
+
+        if user_id in ADMINS and message.get("text") == "View Premium Users":
+            payments = supabase.table("payments").select("*").eq("status", "premium").execute()
+            lines = [f"Chat ID: {p['chat_id']}\nUsername: @{p['username'] or 'N/A'}\n" for p in payments.data]
+            text = "\n".join(lines) if lines else "No premium users."
+            send_message(chat_id, text)
+            return "OK"
+
+        # ---------------- User start ----------------
         if message.get("text") == "/start":
             if check_membership(user_id):
                 send_message(chat_id, "✅ Channel Joined Successfully!")
-                keyboard = build_keyboard(["View Courses"])
-                send_message(chat_id, get_courses_text(), keyboard)
+                send_message(chat_id, get_courses_text(), build_keyboard(["Buy Now For ₹79"]))
+                send_message(chat_id, get_offer_text())
             else:
-                keyboard = build_keyboard(["Join Channel", "Try Again"])
-                send_message(chat_id, "⚠ Please join the channel to access courses.", keyboard)
+                send_message(chat_id, "⚠ Please join the channel to access premium courses.", build_keyboard(["Join Channel", "Try Again"]))
             return "OK"
 
+        # ---------------- Join / Try Again buttons ----------------
         if message.get("text") == "Join Channel":
             url = f"https://t.me/{CHANNEL.strip('@')}"
             send_message(chat_id, f"🔗 Please join here: {url}")
@@ -118,20 +165,50 @@ def webhook():
         if message.get("text") == "Try Again":
             if check_membership(user_id):
                 send_message(chat_id, "✅ Channel Joined Successfully!")
-                keyboard = build_keyboard(["View Courses"])
-                send_message(chat_id, get_courses_text(), keyboard)
+                send_message(chat_id, get_courses_text(), build_keyboard(["Buy Now For ₹79"]))
+                send_message(chat_id, get_offer_text())
             else:
-                keyboard = build_keyboard(["Join Channel", "Try Again"])
-                send_message(chat_id, "⚠ Still not a member. Please join and try again.", keyboard)
+                send_message(chat_id, "⚠ Still not a member. Please join and try again.", build_keyboard(["Join Channel", "Try Again"]))
             return "OK"
 
-        if message.get("text") == "View Courses":
-            send_message(chat_id, get_courses_text())
+        # ---------------- Buy Now ----------------
+        if message.get("text") == "Buy Now For ₹79":
+            send_photo(chat_id, "https://mruser96.42web.io/qr.jpg")
+            send_message(chat_id, get_upi_text())
+            return "OK"
+
+        # ---------------- Handle Payment Screenshot ----------------
+        if "photo" in message:
+            file_id = message["photo"][-1]["file_id"]
+            file_info = requests.get(f"{API_URL}/getFile", params={"file_id": file_id}).json()
+            file_path = file_info["result"]["file_path"]
+            file_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path}"
+            file_content = requests.get(file_url).content
+            filename = f"{user_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}.jpg"
+
+            # Upload to Supabase storage
+            try:
+                supabase.storage.from_("screenshots").upload(filename, file_content)
+                public_url = f"{SUPABASE_URL}/storage/v1/object/public/screenshots/{filename}"
+            except Exception as e:
+                public_url = ""
+                print("Storage upload error:", e)
+
+            # Insert into payments table
+            supabase.table("payments").insert({
+                "chat_id": user_id,
+                "username": username,
+                "screenshot_url": public_url,
+                "status": "pending",
+                "created_at": datetime.now().isoformat()
+            }).execute()
+
+            send_message(chat_id, "✅ Screenshot uploaded! Our team will verify your payment.")
             return "OK"
 
     return "OK"
 
-# ---------------- Set Webhook before first request ----------------
+# ---------------- Set Webhook ----------------
 @app.before_first_request
 def set_webhook():
     url = f"{API_URL}/setWebhook"
