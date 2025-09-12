@@ -40,7 +40,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # Constants
 # -------------------------
 QR_IMAGE_URL = "https://mruser96.42web.io/qr.jpg"
-UPI_ID = "MillionaireNaitik69@fam"   # ✅ updated UPI
+UPI_ID = "MillionaireNaitik69@fam"
 
 COURSES_MESSAGE = (
     "📚 *GxNSS COURSES*\n\n"
@@ -91,7 +91,17 @@ def find_or_create_user(telegram_id, username, first_name=None, last_name=None):
 
 def upload_to_supabase(bucket, object_path, file_bytes, content_type="image/jpeg"):
     object_path = object_path.lstrip("/")
-    supabase.storage.from_(bucket).upload(object_path, io.BytesIO(file_bytes), {"content-type": content_type})
+    try:
+        supabase.storage.from_(bucket).upload(
+            object_path,
+            io.BytesIO(file_bytes),
+            {"content-type": content_type},
+            upsert=True  # ✅ allow overwrite
+        )
+    except Exception as e:
+        logger.exception(f"Supabase upload failed: {e}")
+        raise
+
     if PRIVATE_BUCKET:
         signed_resp = supabase.storage.from_(bucket).create_signed_url(object_path, SIGNED_URL_TTL_SECONDS)
         return object_path, signed_resp.get("signedURL") or signed_resp.get("signed_url")
@@ -128,27 +138,33 @@ def send_welcome(message):
 
     if user and user.get("status") == "premium":
         bot.send_message(cid, "🌟 Welcome back Premium User!\n\nHere is *Page 1* of your courses.", parse_mode="Markdown")
-        # TODO: Replace with actual Page 1 content
     else:
         bot.send_message(cid, COURSES_MESSAGE, parse_mode="Markdown")
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("Buy Course For ₹79", callback_data="buy"))
         bot.send_message(cid, PROMO_MESSAGE, parse_mode="Markdown", reply_markup=markup)
 
-# --- BUY: Send QR + Payment Instructions + "I Paid" inline button ---
+# --- BUY: send QR + instructions + inline button in ONE message ---
 @bot.callback_query_handler(func=lambda c: c.data == "buy")
 def handle_buy(call):
     cid = call.message.chat.id
     bot.answer_callback_query(call.id, "Preparing payment…")
 
-    try:
-        bot.send_photo(cid, QR_IMAGE_URL, caption=f"Scan QR or pay to UPI: `{UPI_ID}`", parse_mode="Markdown")
-    except Exception:
-        bot.send_message(cid, f"Please pay to UPI: `{UPI_ID}`", parse_mode="Markdown")
-
     instr_markup = types.InlineKeyboardMarkup()
     instr_markup.add(types.InlineKeyboardButton("I Paid (Upload Screenshot)", callback_data="i_paid"))
-    bot.send_message(cid, PAYMENT_INSTRUCTIONS, parse_mode="Markdown", reply_markup=instr_markup)
+
+    caption = (
+        f"{PAYMENT_INSTRUCTIONS}\n\n"
+        "👇 After payment, click the button below."
+    )
+
+    bot.send_photo(
+        cid,
+        QR_IMAGE_URL,
+        caption=caption,
+        parse_mode="Markdown",
+        reply_markup=instr_markup
+    )
 
 # --- Ask for screenshot ---
 @bot.callback_query_handler(func=lambda c: c.data == "i_paid")
@@ -157,7 +173,7 @@ def handle_paid(call):
     bot.answer_callback_query(call.id, "Upload screenshot now")
     bot.send_message(cid, "✅ Please upload your payment screenshot here.")
 
-# --- Upload screenshot handler ---
+# --- Upload screenshot ---
 @bot.message_handler(content_types=["photo", "document"])
 def handle_upload(message):
     user = message.from_user
@@ -185,18 +201,19 @@ def handle_upload(message):
         ext = os.path.splitext(file_info.file_path)[1] or ".jpg"
         object_path = f"{UPLOAD_FOLDER_PREFIX}/{telegram_id}_{ts}{ext}"
         _, url = upload_to_supabase(BUCKET_NAME, object_path, file_bytes)
-    except Exception:
-        bot.reply_to(message, "❌ Upload failed. Please try again.")
+    except Exception as e:
+        logger.exception("Supabase storage upload failed")
+        bot.reply_to(message, f"❌ Upload failed. Error: {e}")
         return
 
     try:
-        create_payment(urow, object_path, url, username)
-    except Exception:
+        prow = create_payment(urow, object_path, url, username)
+    except Exception as e:
         bot.reply_to(message, "❌ Could not save payment record. Try again.")
         return
 
     bot.send_message(message.chat.id, "❤️‍🔥 Payment screenshot received! Admin will verify and upgrade you soon.")
-    notify_admins(f"🆕 Payment uploaded by @{username or telegram_id}\nUserID: {urow['id']}\nURL: {url}")
+    notify_admins(f"🆕 Payment uploaded by @{username or telegram_id}\nPaymentID: {prow['id']}\nUserID: {urow['id']}\nURL: {url}")
 
 # -------------------------
 # Admin Commands
@@ -214,8 +231,39 @@ def all_payments(message):
         return
     text = "🧾 *Pending Payments:*\n\n"
     for p in resp.data:
-        text += f"UserID: {p['user_id']}, @{p.get('username')}\nURL: {p['file_url']}\n\n"
+        text += f"PaymentID: {p['id']}, UserID: {p['user_id']}, @{p.get('username')}\nURL: {p['file_url']}\n\n"
     bot.reply_to(message, text, parse_mode="Markdown")
+
+@bot.message_handler(commands=["verify"])
+def verify_payment(message):
+    if not is_admin(message.from_user.id):
+        return
+    args = message.text.split()
+    if len(args) < 2:
+        bot.reply_to(message, "Usage: /verify <payment_id>")
+        return
+    payment_id = args[1]
+    try:
+        presp = supabase.table("payments").select("*").eq("id", int(payment_id)).limit(1).execute()
+        if not presp.data:
+            bot.reply_to(message, "❌ Payment not found.")
+            return
+        payment = presp.data[0]
+        # mark verified
+        supabase.table("payments").update({"verified": True}).eq("id", int(payment_id)).execute()
+        # upgrade user
+        supabase.table("users").update({"status": "premium"}).eq("id", payment["user_id"]).execute()
+        bot.reply_to(message, f"✅ Verified payment {payment_id} and upgraded user {payment['user_id']} to premium.")
+        # notify user
+        uresp = supabase.table("users").select("*").eq("id", payment["user_id"]).limit(1).execute()
+        if uresp.data:
+            try:
+                bot.send_message(uresp.data[0]["telegram_id"], "🎉 Your payment is verified! You are now *Premium*. Enjoy courses 🚀", parse_mode="Markdown")
+            except Exception:
+                pass
+    except Exception as e:
+        logger.exception("Verify failed")
+        bot.reply_to(message, "❌ Verify failed.")
 
 @bot.message_handler(commands=["upgrade"])
 def upgrade_user(message):
@@ -240,7 +288,7 @@ def upgrade_user(message):
                 pass
         else:
             bot.reply_to(message, "❌ User not found.")
-    except Exception as e:
+    except Exception:
         logger.exception("Upgrade failed")
         bot.reply_to(message, "❌ Upgrade failed.")
 
