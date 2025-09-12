@@ -2,6 +2,7 @@ import os
 import io
 import logging
 from datetime import datetime
+
 from flask import Flask, request, abort
 import telebot
 from telebot import types
@@ -13,7 +14,7 @@ from dotenv import load_dotenv
 # -------------------------
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL", "").rstrip("/")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL", "").rstrip("/")  # e.g. https://yourapp.onrender.com
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 BUCKET_NAME = os.getenv("BUCKET_NAME", "screenshots")
@@ -39,7 +40,22 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # Constants
 # -------------------------
 QR_IMAGE_URL = "https://mruser96.42web.io/qr.jpg"
-UPI_ID = "MillionaireNaitik69@fam"
+UPI_ID = "MillionaireNaitik69@fam"   # ✅ updated UPI
+
+COURSES_MESSAGE = (
+    "📚 *GxNSS COURSES*\n\n"
+    "🔹 *Programming Courses*\n"
+    "C++\nJava\nJavaScript\nPython\n\n"
+    "🔹 *Hacking & Cybersecurity Courses*\n"
+    "BlackHat Hacking\nEthical Hacking\nAndroid Hacking\nWiFi Hacking\n"
+    "Binning (by BlackHat)\nAntivirus Development\nPhishing App Development\nPUBG Hack Development\nAPK Modding (20+ Courses)\n\n"
+    "🔹 *System & OS Courses*\nLinux\nPowerShell\n\n"
+    "🔹 *Special Cyber Tools Courses*\n"
+    "How to Make Telegram Number\nHow to Make Lifetime RDP\nHow to Call Any Indian Number Free\n"
+    "How to Make Own SMS Bomber\nHow to Make Own Temporary Mail Bot\n\n"
+    "🔹 *Premium Courses Bundle (31 Paid Courses)*\n"
+    "Cyber Security\nPython\nMachine Learning\nPro Music Production\nPhotoshop CC\n(and many more…)"
+)
 
 PROMO_MESSAGE = (
     "🚀 *Huge Course Bundle – Just ₹79!* (Originally ₹199)\n\n"
@@ -53,8 +69,6 @@ PAYMENT_INSTRUCTIONS = (
     "2. Upload your payment screenshot here.\n\n"
     "We’ll verify and grant access."
 )
-
-COURSES_MESSAGE = "📚 *Premium Courses Access Page 1*\n\n👉 Select a button below to continue!"
 
 # -------------------------
 # DB Helpers
@@ -95,18 +109,12 @@ def create_payment(user_row, file_path, file_url, username):
     }
     return supabase.table("payments").insert(payload).execute().data[0]
 
-def update_user_status(user_id, status="premium"):
-    return supabase.table("users").update({"status": status, "updated_at": datetime.utcnow().isoformat()}).eq("id", user_id).execute()
-
-def verify_payment(user_id):
-    return supabase.table("payments").update({"verified": True}).eq("user_id", user_id).execute()
-
 def notify_admins(text):
     if not ADMIN_TELEGRAM_IDS:
         return
     for aid in ADMIN_TELEGRAM_IDS.split(","):
         try:
-            bot.send_message(int(aid.strip()), text, parse_mode="Markdown")
+            bot.send_message(int(aid.strip()), text)
         except Exception:
             pass
 
@@ -115,98 +123,126 @@ def notify_admins(text):
 # -------------------------
 @bot.message_handler(commands=["start"])
 def send_welcome(message):
-    user = message.from_user
-    telegram_id = user.id
-    urow = find_or_create_user(telegram_id, user.username, user.first_name, user.last_name)
+    cid = message.chat.id
+    user = find_or_create_user(message.from_user.id, message.from_user.username, message.from_user.first_name, message.from_user.last_name)
 
-    if urow["status"] == "premium":
-        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        markup.add("📖 Site Page 1")
-        bot.send_message(message.chat.id, "✅ You successfully accessed our courses 🚀", reply_markup=markup)
-        bot.send_message(message.chat.id, COURSES_MESSAGE, parse_mode="Markdown")
+    if user and user.get("status") == "premium":
+        bot.send_message(cid, "🌟 Welcome back Premium User!\n\nHere is *Page 1* of your courses.", parse_mode="Markdown")
+        # TODO: Replace with actual Page 1 content
     else:
+        bot.send_message(cid, COURSES_MESSAGE, parse_mode="Markdown")
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("Buy Course For ₹79", callback_data="buy"))
-        markup.add(types.InlineKeyboardButton("I Paid (Upload Screenshot)", callback_data="i_paid"))
-        bot.send_message(message.chat.id, PROMO_MESSAGE, parse_mode="Markdown", reply_markup=markup)
+        bot.send_message(cid, PROMO_MESSAGE, parse_mode="Markdown", reply_markup=markup)
 
+# --- BUY: Send QR + Payment Instructions + "I Paid" inline button ---
 @bot.callback_query_handler(func=lambda c: c.data == "buy")
 def handle_buy(call):
     cid = call.message.chat.id
     bot.answer_callback_query(call.id, "Preparing payment…")
-    bot.send_photo(cid, QR_IMAGE_URL, caption=f"Scan QR or pay to UPI: `{UPI_ID}`", parse_mode="Markdown")
-    bot.send_message(cid, PAYMENT_INSTRUCTIONS, parse_mode="Markdown")
 
+    try:
+        bot.send_photo(cid, QR_IMAGE_URL, caption=f"Scan QR or pay to UPI: `{UPI_ID}`", parse_mode="Markdown")
+    except Exception:
+        bot.send_message(cid, f"Please pay to UPI: `{UPI_ID}`", parse_mode="Markdown")
+
+    instr_markup = types.InlineKeyboardMarkup()
+    instr_markup.add(types.InlineKeyboardButton("I Paid (Upload Screenshot)", callback_data="i_paid"))
+    bot.send_message(cid, PAYMENT_INSTRUCTIONS, parse_mode="Markdown", reply_markup=instr_markup)
+
+# --- Ask for screenshot ---
 @bot.callback_query_handler(func=lambda c: c.data == "i_paid")
 def handle_paid(call):
     cid = call.message.chat.id
     bot.answer_callback_query(call.id, "Upload screenshot now")
     bot.send_message(cid, "✅ Please upload your payment screenshot here.")
 
+# --- Upload screenshot handler ---
 @bot.message_handler(content_types=["photo", "document"])
 def handle_upload(message):
     user = message.from_user
     telegram_id = user.id
-    username = user.username
-    fname = user.first_name
-    lname = user.last_name
+    username = user.username or ""
+    fname = user.first_name or ""
+    lname = user.last_name or ""
 
-    fid = message.photo[-1].file_id if message.content_type == "photo" else message.document.file_id
-    file_info = bot.get_file(fid)
-    file_bytes = bot.download_file(file_info.file_path)
+    try:
+        urow = find_or_create_user(telegram_id, username, fname, lname)
+    except Exception:
+        bot.reply_to(message, "❌ Error creating your account. Try again later.")
+        return
 
-    urow = find_or_create_user(telegram_id, username, fname, lname)
+    try:
+        fid = message.photo[-1].file_id if message.content_type == "photo" else message.document.file_id
+        file_info = bot.get_file(fid)
+        file_bytes = bot.download_file(file_info.file_path)
+    except Exception:
+        bot.reply_to(message, "❌ Failed to download screenshot. Try again.")
+        return
 
-    ts = datetime.utcnow().strftime("%Y%m%dT%H%M%S")
-    ext = os.path.splitext(file_info.file_path)[1] or ".jpg"
-    object_path = f"{UPLOAD_FOLDER_PREFIX}/{telegram_id}_{ts}{ext}"
-    _, url = upload_to_supabase(BUCKET_NAME, object_path, file_bytes)
+    try:
+        ts = datetime.utcnow().strftime("%Y%m%dT%H%M%S")
+        ext = os.path.splitext(file_info.file_path)[1] or ".jpg"
+        object_path = f"{UPLOAD_FOLDER_PREFIX}/{telegram_id}_{ts}{ext}"
+        _, url = upload_to_supabase(BUCKET_NAME, object_path, file_bytes)
+    except Exception:
+        bot.reply_to(message, "❌ Upload failed. Please try again.")
+        return
 
-    prow = create_payment(urow, object_path, url, username)
+    try:
+        create_payment(urow, object_path, url, username)
+    except Exception:
+        bot.reply_to(message, "❌ Could not save payment record. Try again.")
+        return
 
-    bot.send_message(
-        message.chat.id,
-        "❤️‍🔥 Please wait some time…\n\nAdmin will verify your payment.\n"
-        "After verification, you can use your bot features. 🚀"
-    )
-
+    bot.send_message(message.chat.id, "❤️‍🔥 Payment screenshot received! Admin will verify and upgrade you soon.")
     notify_admins(f"🆕 Payment uploaded by @{username or telegram_id}\nUserID: {urow['id']}\nURL: {url}")
 
 # -------------------------
 # Admin Commands
 # -------------------------
-@bot.message_handler(commands=["verify"])
-def cmd_verify(message):
-    if str(message.from_user.id) not in ADMIN_TELEGRAM_IDS.split(","):
-        return
+def is_admin(user_id):
+    return str(user_id) in ADMIN_TELEGRAM_IDS.split(",")
 
+@bot.message_handler(commands=["allpayments"])
+def all_payments(message):
+    if not is_admin(message.from_user.id):
+        return
+    resp = supabase.table("payments").select("*").eq("verified", False).execute()
+    if not resp.data:
+        bot.reply_to(message, "✅ No pending payments.")
+        return
+    text = "🧾 *Pending Payments:*\n\n"
+    for p in resp.data:
+        text += f"UserID: {p['user_id']}, @{p.get('username')}\nURL: {p['file_url']}\n\n"
+    bot.reply_to(message, text, parse_mode="Markdown")
+
+@bot.message_handler(commands=["upgrade"])
+def upgrade_user(message):
+    if not is_admin(message.from_user.id):
+        return
     args = message.text.split()
     if len(args) < 2:
-        bot.reply_to(message, "Usage: /verify <user_id or username>")
+        bot.reply_to(message, "Usage: /upgrade <user_id or username>")
         return
-
-    identifier = args[1]
-    resp = None
-
-    if identifier.isdigit():
-        resp = supabase.table("users").select("*").eq("id", int(identifier)).limit(1).execute()
-    else:
-        resp = supabase.table("users").select("*").eq("username", identifier).limit(1).execute()
-
-    if not resp.data:
-        bot.reply_to(message, "❌ User not found")
-        return
-
-    user_row = resp.data[0]
-    update_user_status(user_row["id"], "premium")
-    verify_payment(user_row["id"])
-
-    bot.reply_to(message, f"✅ User {user_row['username'] or user_row['id']} upgraded to premium!")
-
+    target = args[1]
     try:
-        bot.send_message(user_row["telegram_id"], "🎉 Your payment is verified!\nYou are now a *Premium User*! 🚀", parse_mode="Markdown")
-    except:
-        pass
+        if target.isdigit():
+            resp = supabase.table("users").update({"status": "premium"}).eq("id", int(target)).execute()
+        else:
+            resp = supabase.table("users").update({"status": "premium"}).eq("username", target).execute()
+        if resp.data:
+            u = resp.data[0]
+            bot.reply_to(message, f"✅ Upgraded {u.get('username') or u['id']} to premium.")
+            try:
+                bot.send_message(u["telegram_id"], "🎉 You’ve been upgraded to *Premium*! Enjoy full course access 🚀", parse_mode="Markdown")
+            except Exception:
+                pass
+        else:
+            bot.reply_to(message, "❌ User not found.")
+    except Exception as e:
+        logger.exception("Upgrade failed")
+        bot.reply_to(message, "❌ Upgrade failed.")
 
 # -------------------------
 # Flask Routes
