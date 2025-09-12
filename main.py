@@ -2,7 +2,6 @@ import os
 import io
 import logging
 from datetime import datetime
-
 from flask import Flask, request, abort
 import telebot
 from telebot import types
@@ -14,7 +13,7 @@ from dotenv import load_dotenv
 # -------------------------
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL", "").rstrip("/")  # e.g. https://yourapp.onrender.com
+WEBHOOK_URL = os.getenv("WEBHOOK_URL", "").rstrip("/")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 BUCKET_NAME = os.getenv("BUCKET_NAME", "screenshots")
@@ -40,17 +39,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # Constants
 # -------------------------
 QR_IMAGE_URL = "https://mruser96.42web.io/qr.jpg"
-UPI_ID = "MillionaireNaitik69@fam"   # ✅ updated UPI
-
-COURSES_MESSAGE = (
-    "📚 *GxNSS COURSES*\n\n"
-    "🔹 *Programming*\n• C++\n• Java\n• JavaScript\n• Python\n\n"
-    "🔹 *Hacking & Cybersecurity*\n• BlackHat\n• Ethical Hacking\n• Android Hacking\n• WiFi Hacking\n"
-    "• Antivirus Development\n• Phishing App Development\n• PUBG Hack Development\n• APK Modding (20+)\n\n"
-    "🔹 *System & OS*\n• Linux\n• PowerShell\n\n"
-    "🔹 *Special Tools*\n• Telegram Number\n• Lifetime RDP\n• Call Any Number Free\n• SMS Bomber\n• Temp Mail Bot\n\n"
-    "🔹 *Premium Bundle (31 Courses)*"
-)
+UPI_ID = "MillionaireNaitik69@fam"
 
 PROMO_MESSAGE = (
     "🚀 *Huge Course Bundle – Just ₹79!* (Originally ₹199)\n\n"
@@ -64,6 +53,8 @@ PAYMENT_INSTRUCTIONS = (
     "2. Upload your payment screenshot here.\n\n"
     "We’ll verify and grant access."
 )
+
+COURSES_MESSAGE = "📚 *Premium Courses Access Page 1*\n\n👉 Select a button below to continue!"
 
 # -------------------------
 # DB Helpers
@@ -104,12 +95,18 @@ def create_payment(user_row, file_path, file_url, username):
     }
     return supabase.table("payments").insert(payload).execute().data[0]
 
+def update_user_status(user_id, status="premium"):
+    return supabase.table("users").update({"status": status, "updated_at": datetime.utcnow().isoformat()}).eq("id", user_id).execute()
+
+def verify_payment(user_id):
+    return supabase.table("payments").update({"verified": True}).eq("user_id", user_id).execute()
+
 def notify_admins(text):
     if not ADMIN_TELEGRAM_IDS:
         return
     for aid in ADMIN_TELEGRAM_IDS.split(","):
         try:
-            bot.send_message(int(aid.strip()), text)
+            bot.send_message(int(aid.strip()), text, parse_mode="Markdown")
         except Exception:
             pass
 
@@ -118,12 +115,20 @@ def notify_admins(text):
 # -------------------------
 @bot.message_handler(commands=["start"])
 def send_welcome(message):
-    cid = message.chat.id
-    bot.send_message(cid, COURSES_MESSAGE, parse_mode="Markdown")
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("Buy Course For ₹79", callback_data="buy"))
-    markup.add(types.InlineKeyboardButton("I Paid (Upload Screenshot)", callback_data="i_paid"))
-    bot.send_message(cid, PROMO_MESSAGE, parse_mode="Markdown", reply_markup=markup)
+    user = message.from_user
+    telegram_id = user.id
+    urow = find_or_create_user(telegram_id, user.username, user.first_name, user.last_name)
+
+    if urow["status"] == "premium":
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        markup.add("📖 Site Page 1")
+        bot.send_message(message.chat.id, "✅ You successfully accessed our courses 🚀", reply_markup=markup)
+        bot.send_message(message.chat.id, COURSES_MESSAGE, parse_mode="Markdown")
+    else:
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("Buy Course For ₹79", callback_data="buy"))
+        markup.add(types.InlineKeyboardButton("I Paid (Upload Screenshot)", callback_data="i_paid"))
+        bot.send_message(message.chat.id, PROMO_MESSAGE, parse_mode="Markdown", reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda c: c.data == "buy")
 def handle_buy(call):
@@ -140,35 +145,68 @@ def handle_paid(call):
 
 @bot.message_handler(content_types=["photo", "document"])
 def handle_upload(message):
-    cid = message.chat.id
     user = message.from_user
+    telegram_id = user.id
     username = user.username
     fname = user.first_name
     lname = user.last_name
 
-    # get file
     fid = message.photo[-1].file_id if message.content_type == "photo" else message.document.file_id
     file_info = bot.get_file(fid)
     file_bytes = bot.download_file(file_info.file_path)
 
-    # user + upload
-    urow = find_or_create_user(cid, username, fname, lname)
+    urow = find_or_create_user(telegram_id, username, fname, lname)
+
     ts = datetime.utcnow().strftime("%Y%m%dT%H%M%S")
     ext = os.path.splitext(file_info.file_path)[1] or ".jpg"
-    object_path = f"{UPLOAD_FOLDER_PREFIX}/{cid}_{ts}{ext}"
+    object_path = f"{UPLOAD_FOLDER_PREFIX}/{telegram_id}_{ts}{ext}"
     _, url = upload_to_supabase(BUCKET_NAME, object_path, file_bytes)
 
     prow = create_payment(urow, object_path, url, username)
 
-    # ✅ Success message to user
     bot.send_message(
-        cid,
+        message.chat.id,
         "❤️‍🔥 Please wait some time…\n\nAdmin will verify your payment.\n"
         "After verification, you can use your bot features. 🚀"
     )
 
-    # notify admins
-    notify_admins(f"🆕 Payment uploaded by {username or cid}\nUserID: {urow['id']}\nURL: {url}")
+    notify_admins(f"🆕 Payment uploaded by @{username or telegram_id}\nUserID: {urow['id']}\nURL: {url}")
+
+# -------------------------
+# Admin Commands
+# -------------------------
+@bot.message_handler(commands=["verify"])
+def cmd_verify(message):
+    if str(message.from_user.id) not in ADMIN_TELEGRAM_IDS.split(","):
+        return
+
+    args = message.text.split()
+    if len(args) < 2:
+        bot.reply_to(message, "Usage: /verify <user_id or username>")
+        return
+
+    identifier = args[1]
+    resp = None
+
+    if identifier.isdigit():
+        resp = supabase.table("users").select("*").eq("id", int(identifier)).limit(1).execute()
+    else:
+        resp = supabase.table("users").select("*").eq("username", identifier).limit(1).execute()
+
+    if not resp.data:
+        bot.reply_to(message, "❌ User not found")
+        return
+
+    user_row = resp.data[0]
+    update_user_status(user_row["id"], "premium")
+    verify_payment(user_row["id"])
+
+    bot.reply_to(message, f"✅ User {user_row['username'] or user_row['id']} upgraded to premium!")
+
+    try:
+        bot.send_message(user_row["telegram_id"], "🎉 Your payment is verified!\nYou are now a *Premium User*! 🚀", parse_mode="Markdown")
+    except:
+        pass
 
 # -------------------------
 # Flask Routes
