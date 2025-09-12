@@ -81,6 +81,7 @@ def find_or_create_user(telegram_id, username, first_name=None, last_name=None):
         "first_name": first_name,
         "last_name": last_name,
         "status": "normal",
+        "upload_mode": False,  # ✅ new field to control screenshot mode
         "created_at": datetime.utcnow().isoformat(),
         "updated_at": datetime.utcnow().isoformat(),
     }
@@ -88,15 +89,17 @@ def find_or_create_user(telegram_id, username, first_name=None, last_name=None):
     return ins.data[0] if ins.data else None
 
 
+def set_upload_mode(user_id, mode: bool):
+    supabase.table("users").update({"upload_mode": mode}).eq("telegram_id", user_id).execute()
+
+
 def upload_to_supabase(bucket, object_path, file_bytes, content_type="image/jpeg"):
     object_path = object_path.lstrip("/")
     storage = supabase.storage.from_(bucket)
-
     try:
         storage.remove([object_path])
     except Exception:
         pass
-
     storage.upload(object_path, file_bytes, {"content-type": content_type})
     return object_path, storage.get_public_url(object_path)
 
@@ -180,7 +183,9 @@ def handle_buy(call):
 @bot.callback_query_handler(func=lambda c: c.data == "i_paid")
 def handle_paid(call):
     cid = call.message.chat.id
+    uid = call.from_user.id
     bot.answer_callback_query(call.id, "Upload screenshot now")
+    set_upload_mode(uid, True)  # ✅ enable upload mode
     bot.send_message(cid, "✅ Please upload your payment screenshot here.\n\nMake sure the screenshot clearly shows the transaction details.")
 
 
@@ -188,6 +193,13 @@ def handle_paid(call):
 def handle_upload(message):
     user = message.from_user
     urow = find_or_create_user(user.id, user.username or "", user.first_name or "", user.last_name or "")
+
+    # ✅ Only accept if user clicked "I Paid"
+    if not urow.get("upload_mode"):
+        return  # ignore uploads
+
+    # disable upload mode so user cannot spam multiple
+    set_upload_mode(user.id, False)
 
     try:
         fid = message.photo[-1].file_id if message.content_type == "photo" else message.document.file_id
