@@ -1,6 +1,4 @@
-Flask==2.2.5
-requests==2.32.0
-python-dotenv==1.0.1
+Flask
+pyTelegramBotAPI
+gunicorn
 supabase
-pyTelegramBotAPI==4.11.0
-appwrite==7.1.0
