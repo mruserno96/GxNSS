@@ -37,7 +37,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # Constants
 # -------------------------
 UPI_ID = "MillionaireNaitik69@fam"
-QR_IMAGE_URL = "https://mruser96.42web.io/qr.jpg?nocache="  # always latest
+QR_IMAGE_URL = "https://mruser96.42web.io/qr.jpg?nocache="
 
 COURSES_MESSAGE = (
     "📚 *GxNSS COURSES*\n\n"
@@ -170,7 +170,7 @@ def handle_buy(call):
 
     bot.send_photo(
         cid,
-        QR_IMAGE_URL + datetime.utcnow().strftime("%H%M%S"),  # fresh QR
+        QR_IMAGE_URL + datetime.utcnow().strftime("%H%M%S"),
         caption=caption,
         parse_mode="Markdown",
         reply_markup=instr_markup
@@ -231,37 +231,23 @@ def admin_help(message):
     bot.reply_to(message, (
         "👮 *Admin Commands*\n\n"
         "/allpayments – View pending payments\n"
-        "/verify <user_id> – Verify a user\n"
-        "/upgrade <user_id|username> – Upgrade manually"
+        "/upgrade <userid|username> – Upgrade manually"
     ), parse_mode="Markdown")
+
 
 @bot.message_handler(commands=["allpayments"])
 def admin_allpayments(message):
     if not is_admin(message.from_user.id):
         return
-    rows = supabase.table("payments").select("*").eq("verified", False).execute().data
-    if not rows:
+    rows = supabase.table("payments").select("*").eq("verified", False).execute().data or []
+    if len(rows) == 0:
         bot.reply_to(message, "✅ No pending payments.")
         return
     msg = "📂 *Pending Payments:*\n\n"
     for r in rows:
-        msg += f"UserID: {r['user_id']} | @{r['username']}\nURL: {r['file_url']}\n\n"
-    bot.reply_to(message, msg, parse_mode="Markdown", disable_web_page_preview=True)
+        msg += f"UserID: {r['user_id']} | @{r.get('username','')}\nURL: {r['file_url']}\n\n"
+    bot.reply_to(message, msg.strip(), parse_mode="Markdown", disable_web_page_preview=True)
 
-@bot.message_handler(commands=["verify"])
-def admin_verify(message):
-    if not is_admin(message.from_user.id):
-        return
-    args = message.text.split()
-    if len(args) < 2:
-        bot.reply_to(message, "Usage: /verify <user_id>")
-        return
-    uid = args[1]
-
-    supabase.table("payments").update({"verified": True}).eq("user_id", uid).execute()
-    user_row = supabase.table("users").update({"status": "premium"}).eq("id", uid).execute().data[0]
-    bot.reply_to(message, f"✅ User {uid} upgraded to Premium!")
-    notify_user_upgrade(user_row)
 
 @bot.message_handler(commands=["upgrade"])
 def admin_upgrade(message):
@@ -269,14 +255,16 @@ def admin_upgrade(message):
         return
     args = message.text.split()
     if len(args) < 2:
-        bot.reply_to(message, "Usage: /upgrade <user_id_or_username>")
+        bot.reply_to(message, "Usage: /upgrade <user_id|username>")
         return
     target = args[1]
 
     if target.isdigit():
         user_row = supabase.table("users").update({"status": "premium"}).eq("id", target).execute().data[0]
+        supabase.table("payments").update({"verified": True}).eq("user_id", target).execute()
     else:
         user_row = supabase.table("users").update({"status": "premium"}).eq("username", target).execute().data[0]
+        supabase.table("payments").update({"verified": True}).eq("username", target).execute()
 
     bot.reply_to(message, f"✅ User {target} upgraded to Premium!")
     notify_user_upgrade(user_row)
