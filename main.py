@@ -1,5 +1,4 @@
 import os
-import io
 import logging
 from datetime import datetime
 
@@ -88,6 +87,7 @@ def find_or_create_user(telegram_id, username, first_name=None, last_name=None):
     ins = supabase.table("users").insert(new_user).execute()
     return ins.data[0] if ins.data else None
 
+
 def upload_to_supabase(bucket, object_path, file_bytes, content_type="image/jpeg"):
     object_path = object_path.lstrip("/")
     storage = supabase.storage.from_(bucket)
@@ -99,9 +99,10 @@ def upload_to_supabase(bucket, object_path, file_bytes, content_type="image/jpeg
         pass
 
     try:
+        # ✅ pass raw bytes (not BytesIO)
         storage.upload(
             object_path,
-            io.BytesIO(file_bytes),
+            file_bytes,
             {"content-type": content_type}
         )
     except Exception as e:
@@ -109,6 +110,7 @@ def upload_to_supabase(bucket, object_path, file_bytes, content_type="image/jpeg
         raise
 
     return object_path, storage.get_public_url(object_path)
+
 
 def create_payment(user_row, file_path, file_url, username):
     payload = {
@@ -120,6 +122,7 @@ def create_payment(user_row, file_path, file_url, username):
         "created_at": datetime.utcnow().isoformat(),
     }
     return supabase.table("payments").insert(payload).execute().data[0]
+
 
 def notify_admins(text):
     if not ADMIN_TELEGRAM_IDS:
@@ -148,6 +151,7 @@ def send_welcome(message):
     markup.add(types.InlineKeyboardButton("Buy Course For ₹79", callback_data="buy"))
     bot.send_message(cid, PROMO_MESSAGE, parse_mode="Markdown", reply_markup=markup)
 
+
 # --- BUY flow: QR + Payment Instructions + Inline "I Paid" ---
 @bot.callback_query_handler(func=lambda c: c.data == "buy")
 def handle_buy(call):
@@ -167,11 +171,13 @@ def handle_buy(call):
         reply_markup=instr_markup
     )
 
+
 @bot.callback_query_handler(func=lambda c: c.data == "i_paid")
 def handle_paid(call):
     cid = call.message.chat.id
     bot.answer_callback_query(call.id, "Upload screenshot now")
     bot.send_message(cid, "✅ Please upload your payment screenshot here.\n\nMake sure the screenshot clearly shows the transaction details.")
+
 
 # --- Upload handler ---
 @bot.message_handler(content_types=["photo", "document"])
@@ -222,11 +228,14 @@ def handle_upload(message):
 
     bot.send_message(
         message.chat.id,
-        "❤️‍🔥 Payment screenshot received!\n\nAdmin will verify your payment shortly. "
-        "If approved, you'll be upgraded to Premium. 🚀"
+        f"❤️‍🔥 Payment screenshot received!\n\nAdmin will verify your payment shortly. "
+        f"If approved, you'll be upgraded to Premium. 🚀\n\n[🔗 View your screenshot]({url})",
+        parse_mode="Markdown",
+        disable_web_page_preview=False
     )
 
     notify_admins(f"🆕 Payment uploaded by @{username or telegram_id}\nUserID: {urow['id']}\nURL: {url}")
+
 
 # -------------------------
 # Admin Commands
@@ -244,6 +253,7 @@ def admin_allpayments(message):
         msg += f"UserID: {r['user_id']} | @{r['username']}\nURL: {r['file_url']}\n\n"
     bot.reply_to(message, msg, parse_mode="Markdown", disable_web_page_preview=True)
 
+
 @bot.message_handler(commands=["verify"])
 def admin_verify(message):
     if str(message.from_user.id) not in ADMIN_TELEGRAM_IDS.split(","):
@@ -257,6 +267,7 @@ def admin_verify(message):
     supabase.table("payments").update({"verified": True}).eq("user_id", uid).execute()
     supabase.table("users").update({"status": "premium"}).eq("id", uid).execute()
     bot.reply_to(message, f"✅ User {uid} upgraded to Premium!")
+
 
 @bot.message_handler(commands=["upgrade"])
 def admin_upgrade(message):
@@ -274,12 +285,14 @@ def admin_upgrade(message):
         supabase.table("users").update({"status": "premium"}).eq("username", target).execute()
     bot.reply_to(message, f"✅ User {target} upgraded to Premium!")
 
+
 # -------------------------
 # Flask Routes
 # -------------------------
 @app.route("/", methods=["GET"])
 def index():
     return "Bot is running", 200
+
 
 @app.route("/set_webhook", methods=["GET"])
 def set_webhook():
@@ -288,6 +301,7 @@ def set_webhook():
     bot.set_webhook(url=full_url)
     return f"Webhook set to {full_url}", 200
 
+
 @app.route(f"/{BOT_TOKEN}", methods=["POST"])
 def telegram_webhook():
     if request.headers.get("content-type") != "application/json":
@@ -295,6 +309,7 @@ def telegram_webhook():
     update = telebot.types.Update.de_json(request.get_data().decode("utf-8"))
     bot.process_new_updates([update])
     return "OK", 200
+
 
 # -------------------------
 # Run Locally
