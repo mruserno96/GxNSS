@@ -51,7 +51,6 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # -------------------------
 UPI_ID = "MillionaireNaitik69@fam"
 QR_IMAGE_URL = "https://mruser96.42web.io/qr.jpg?nocache="
-
 COURSES_MESSAGE = (
     "📚 *GxNSS COURSES*\n\n"
     "🔹 *Programming Courses*\n"
@@ -67,15 +66,13 @@ COURSES_MESSAGE = (
     "🔹 *Premium Courses Bundle (31 Paid Courses)*\n"
     "Cyber Security\nPython\nMachine Learning\nPro Music Production\nPhotoshop CC\n(and many more…)"
 )
-
 PROMO_MESSAGE = (
     "🚀 *Huge Course Bundle – Just ₹79!* (Originally ₹199)\n\n"
     "Get 30+ premium courses with guaranteed results. Don’t miss this offer!"
 )
-
 PAYMENT_INSTRUCTIONS = (
     f"🔔 *Payment Instructions*\n\n"
-    f"UPI: `{UPI_ID}`\n\n"
+    f"UPI: {UPI_ID}\n\n"
     "1. Scan the QR or pay using the UPI above.\n"
     "2. Click *I Paid (Upload Screenshot)* below to upload proof.\n\n"
     "We’ll verify and grant access."
@@ -230,15 +227,18 @@ def premium_courses_keyboard():
 def send_welcome(message):
     cid = message.chat.id
     user = find_or_create_user(
-        message.from_user.id, 
-        message.from_user.username, 
-        message.from_user.first_name, 
+        message.from_user.id,
+        message.from_user.username,
+        message.from_user.first_name,
         message.from_user.last_name
     )
 
     if user and user.get("status") == "premium":
-        bot.send_message(cid, "🎉 Welcome back Premium User!\n\nSelect a category to view courses:", 
-                         reply_markup=main_menu_keyboard())
+        bot.send_message(
+            cid,
+            "🎉 Welcome back Premium User!",
+            reply_markup=main_menu_keyboard()
+        )
         return
 
     # Normal users
@@ -261,7 +261,7 @@ def handle_menu(message):
     uresp = supabase.table("users").select("*").eq("telegram_id", message.from_user.id).single().execute()
     user_row = uresp.data
     if not user_row or user_row.get("status") != "premium":
-        return  # ignore non-premium
+        return
 
     if text == "🔹 Programming Courses":
         bot.send_message(chat_id, "Select a course:", reply_markup=programming_courses_keyboard())
@@ -273,10 +273,8 @@ def handle_menu(message):
         bot.send_message(chat_id, "Select a course:", reply_markup=special_tools_courses_keyboard())
     elif text == "🔹 Premium Courses Bundle (31 Paid Courses)":
         bot.send_message(chat_id, "Select a course:", reply_markup=premium_courses_keyboard())
-    
     elif text == "⬅ Back":
         bot.send_message(chat_id, "Main Menu:", reply_markup=main_menu_keyboard())
-
     else:
         course_links = {
             "C++": "https://link_to_cpp_course",
@@ -286,7 +284,6 @@ def handle_menu(message):
             "Ethical Hacking": "https://link_to_ethical_course",
             "Linux": "https://link_to_linux_course",
             "Cyber Security": "https://link_to_cyber_course",
-            # Add all courses here...
         }
         link = course_links.get(text)
         if link:
@@ -295,10 +292,12 @@ def handle_menu(message):
 # -------------------------
 # Payment Handlers
 # -------------------------
-# [Keep all your existing handle_buy, handle_paid, handle_upload functions as-is]
+# Keep all your existing handle_buy, handle_paid, handle_upload functions as-is
+
 # -------------------------
 # Admin Handlers
-# [Keep all your admin /upgrade and /allpremiumuser functions as-is]
+# -------------------------
+# Keep all your admin /upgrade and /allpremiumuser functions as-is
 
 # -------------------------
 # Flask Routes
