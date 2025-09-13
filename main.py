@@ -24,7 +24,7 @@ _ADMIN_TELEGRAM_IDS_RAW = os.getenv("ADMIN_TELEGRAM_IDS", "")
 if not BOT_TOKEN or not WEBHOOK_URL or not SUPABASE_URL or not SUPABASE_KEY:
     raise RuntimeError("❌ Missing required environment variables")
 
-# normalize admin ids into a set of ints for quick checks
+# Parse admin IDs
 ADMIN_IDS = set()
 for part in (_ADMIN_TELEGRAM_IDS_RAW or "").split(","):
     part = part.strip()
@@ -142,7 +142,7 @@ def create_payment(user_row, file_path, file_url, username):
         "username": username,
         "file_path": file_path,
         "file_url": file_url,
-        "verified": False,
+        "verified": False,  # always store as proper boolean
         "created_at": datetime.utcnow().isoformat(),
     }
     res = supabase.table("payments").insert(payload).execute()
@@ -181,7 +181,6 @@ def notify_user_upgrade(user_row):
         save_message(user_row["id"], user_row["telegram_id"], sent.message_id)
     except Exception:
         pass
-
 
 # -------------------------
 # User Flow
@@ -318,10 +317,11 @@ def admin_allpayments(message):
         bot.reply_to(message, "❌ Failed to fetch payments from DB.")
         return
 
+    # Filter pending manually
     pending = []
     for r in rows:
         v = r.get("verified")
-        if v in (False, None, "false", "False", 0, "0"):
+        if v in (False, None, 0, "0", "false", "False"):
             pending.append(r)
 
     if not pending:
