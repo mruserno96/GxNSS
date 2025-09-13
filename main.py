@@ -4,7 +4,6 @@ import threading
 import time
 import requests
 from datetime import datetime
-
 from flask import Flask, request, abort
 import telebot
 from telebot import types
@@ -20,10 +19,21 @@ WEBHOOK_URL = os.getenv("WEBHOOK_URL", "").rstrip("/")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 BUCKET_NAME = os.getenv("BUCKET_NAME", "screenshots")
-ADMIN_TELEGRAM_IDS = os.getenv("ADMIN_TELEGRAM_IDS", "")
+_ADMIN_TELEGRAM_IDS_RAW = os.getenv("ADMIN_TELEGRAM_IDS", "")
 
 if not BOT_TOKEN or not WEBHOOK_URL or not SUPABASE_URL or not SUPABASE_KEY:
     raise RuntimeError("❌ Missing required environment variables")
+
+# normalize admin ids into a set of ints for quick checks
+ADMIN_IDS = set()
+for part in (_ADMIN_TELEGRAM_IDS_RAW or "").split(","):
+    part = part.strip()
+    if not part:
+        continue
+    try:
+        ADMIN_IDS.add(int(part))
+    except ValueError:
+        pass
 
 UPLOAD_FOLDER_PREFIX = os.getenv("UPLOAD_FOLDER_PREFIX", "payments")
 
@@ -72,12 +82,35 @@ PAYMENT_INSTRUCTIONS = (
 )
 
 # -------------------------
-# DB Helpers
+# Helpers
 # -------------------------
+def is_admin(user_id: int) -> bool:
+    try:
+        return int(user_id) in ADMIN_IDS
+    except Exception:
+        return False
+
+
+def notify_admins(text):
+    if not ADMIN_IDS:
+        return
+    for aid in ADMIN_IDS:
+        try:
+            bot.send_message(aid, text, disable_web_page_preview=True)
+        except Exception:
+            pass
+
+
 def find_or_create_user(telegram_id, username, first_name=None, last_name=None):
+    try:
+        telegram_id = int(telegram_id)
+    except Exception:
+        pass
+
     resp = supabase.table("users").select("*").eq("telegram_id", telegram_id).limit(1).execute()
     if resp.data:
         return resp.data[0]
+
     new_user = {
         "telegram_id": telegram_id,
         "username": username,
@@ -112,26 +145,10 @@ def create_payment(user_row, file_path, file_url, username):
         "verified": False,
         "created_at": datetime.utcnow().isoformat(),
     }
-    return supabase.table("payments").insert(payload).execute().data[0]
+    res = supabase.table("payments").insert(payload).execute()
+    return res.data[0] if res.data else None
 
 
-def notify_admins(text):
-    if not ADMIN_TELEGRAM_IDS:
-        return
-    for aid in ADMIN_TELEGRAM_IDS.split(","):
-        try:
-            bot.send_message(int(aid.strip()), text, disable_web_page_preview=True)
-        except Exception:
-            pass
-
-
-def is_admin(user_id: int) -> bool:
-    return str(user_id) in ADMIN_TELEGRAM_IDS.split(",")
-
-
-# -------------------------
-# Message Tracking Helpers
-# -------------------------
 def save_message(user_id, chat_id, message_id):
     try:
         supabase.table("messages").insert({
@@ -139,8 +156,8 @@ def save_message(user_id, chat_id, message_id):
             "chat_id": chat_id,
             "message_id": message_id
         }).execute()
-    except Exception as e:
-        logger.error(f"❌ Failed to save message: {e}")
+    except Exception:
+        pass
 
 
 def delete_old_messages(user_row):
@@ -150,7 +167,6 @@ def delete_old_messages(user_row):
             bot.delete_message(r["chat_id"], r["message_id"])
         except Exception:
             pass
-    # clear from DB
     supabase.table("messages").delete().eq("user_id", user_row["id"]).execute()
 
 
@@ -163,8 +179,8 @@ def notify_user_upgrade(user_row):
             parse_mode="Markdown"
         )
         save_message(user_row["id"], user_row["telegram_id"], sent.message_id)
-    except Exception as e:
-        logger.error(f"❌ Failed to notify upgrade: {e}")
+    except Exception:
+        pass
 
 
 # -------------------------
@@ -229,9 +245,15 @@ def handle_paid(call):
 @bot.message_handler(content_types=["photo", "document"])
 def handle_upload(message):
     user = message.from_user
-    urow = supabase.table("users").select("*").eq("telegram_id", user.id).single().execute().data
+    try:
+        t_id = int(user.id)
+    except Exception:
+        t_id = user.id
+
+    uresp = supabase.table("users").select("*").eq("telegram_id", t_id).single().execute()
+    urow = uresp.data
     if not urow or not urow.get("pending_upload"):
-        bot.reply_to(message, "⚠️ Please click *I Paid (Upload Screenshot)* before sending a screenshot.")
+        bot.reply_to(message, "⚠️ Please click *I Paid (Upload Screenshot)* before sending a screenshot.", parse_mode="Markdown")
         return
 
     try:
@@ -266,7 +288,7 @@ def handle_upload(message):
         "Admin will verify your payment shortly. If approved, you'll be upgraded to Premium. 🚀",
         parse_mode="Markdown"
     )
-    notify_admins(f"🆕 Payment uploaded by @{user.username or user.id}\nUserID: {urow['id']}\nURL: {url}")
+    notify_admins(f"🆕 Payment uploaded by @{user.username or user.id}\nUserID: {urow.get('id')}\nURL: {url}")
 
 
 # -------------------------
@@ -288,14 +310,31 @@ def admin_help(message):
 def admin_allpayments(message):
     if not is_admin(message.from_user.id):
         return
-    rows = supabase.table("payments").select("*").eq("verified", False).execute().data or []
-    if not rows:
+
+    try:
+        res = supabase.table("payments").select("*").order("created_at", desc=True).limit(200).execute()
+        rows = res.data or []
+    except Exception:
+        bot.reply_to(message, "❌ Failed to fetch payments from DB.")
+        return
+
+    pending = []
+    for r in rows:
+        v = r.get("verified")
+        if v in (False, None, "false", "False", 0, "0"):
+            pending.append(r)
+
+    if not pending:
         bot.reply_to(message, "✅ No pending payments.")
         return
-    msg = "📂 *Pending Payments:*\n\n"
-    for r in rows:
-        msg += f"UserID: {r['user_id']} | @{r.get('username','')}\nURL: {r['file_url']}\n\n"
-    bot.reply_to(message, msg.strip(), parse_mode="Markdown", disable_web_page_preview=True)
+
+    msg_lines = ["📂 *Pending Payments:*", ""]
+    for r in pending:
+        msg_lines.append(f"UserID: {r.get('user_id')} | @{r.get('username','')}")
+        msg_lines.append(f"URL: {r.get('file_url')}")
+        msg_lines.append("")
+
+    bot.reply_to(message, "\n".join(msg_lines).strip(), parse_mode="Markdown", disable_web_page_preview=True)
 
 
 @bot.message_handler(commands=["allpremiumuser"])
@@ -323,26 +362,41 @@ def admin_allpremiumuser(message):
 def admin_upgrade(message):
     if not is_admin(message.from_user.id):
         return
+
     args = message.text.split()
     if len(args) < 2:
         bot.reply_to(message, "Usage: /upgrade <user_id|username>")
         return
     target = args[1]
 
-    if target.isdigit():
-        data = supabase.table("users").update({"status": "premium"}).eq("id", target).execute().data
-        user_row = data[0] if data else None
-        supabase.table("payments").update({"verified": True}).eq("user_id", target).execute()
-    else:
-        data = supabase.table("users").update({"status": "premium"}).eq("username", target).execute().data
-        user_row = data[0] if data else None
-        supabase.table("payments").update({"verified": True}).eq("username", target).execute()
+    try:
+        if target.isdigit():
+            resp = supabase.table("users").select("*").eq("id", int(target)).limit(1).execute()
+        else:
+            username_lookup = target.lstrip("@")
+            resp = supabase.table("users").select("*").eq("username", username_lookup).limit(1).execute()
+    except Exception:
+        bot.reply_to(message, "❌ Database error while searching for user.")
+        return
 
-    if user_row:
-        bot.reply_to(message, f"✅ User {target} upgraded to Premium!")
-        notify_user_upgrade(user_row)
-    else:
+    user_row = (resp.data or [None])[0]
+    if not user_row:
         bot.reply_to(message, f"❌ User {target} not found.")
+        return
+
+    if user_row.get("status") == "premium":
+        bot.reply_to(message, f"✅ User {target} is already Premium.")
+        return
+
+    try:
+        supabase.table("users").update({"status": "premium", "updated_at": datetime.utcnow().isoformat()}).eq("id", user_row["id"]).execute()
+        supabase.table("payments").update({"verified": True}).eq("user_id", user_row["id"]).execute()
+    except Exception:
+        bot.reply_to(message, f"❌ Failed to upgrade {target}.")
+        return
+
+    notify_user_upgrade(user_row)
+    bot.reply_to(message, f"✅ User {target} upgraded to Premium!")
 
 
 # -------------------------
@@ -369,17 +423,15 @@ def telegram_webhook():
 
 
 # -------------------------
-# Auto Ping (Prevent Sleep)
+# Auto Ping
 # -------------------------
 def auto_ping():
     while True:
         try:
-            url = WEBHOOK_URL or ""
-            if url:
-                requests.get(url, timeout=10)
-                logger.info("🔄 Auto-ping successful")
-        except Exception as e:
-            logger.warning(f"⚠️ Auto-ping failed: {e}")
+            if WEBHOOK_URL:
+                requests.get(WEBHOOK_URL, timeout=10)
+        except Exception:
+            pass
         time.sleep(300)
 
 
