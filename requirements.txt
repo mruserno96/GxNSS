@@ -3,3 +3,4 @@ pyTelegramBotAPI
 gunicorn
 supabase
 python-dotenv
+requests
