@@ -194,7 +194,7 @@ def hacking_courses_keyboard():
     markup.add(
         "BlackHat Hacking", "Ethical Hacking", "Android Hacking", "WiFi Hacking",
         "Binning (by BlackHat)", "Antivirus Development", "Phishing App Development",
-        "PUBG Hack Development", "APK Modding (20+ Courses)", "⬅ Back"
+        "PUBG Hack Development", "APK Modding 20+ Course", "⬅ Back"
     )
     return markup
 
@@ -206,9 +206,9 @@ def system_os_courses_keyboard():
 def special_tools_courses_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     markup.add(
-        "How to Make Telegram Number", "How to Make Lifetime RDP",
-        "How to Call Any Indian Number Free", "How to Make Own SMS Bomber",
-        "How to Make Own Temporary Mail Bot", "⬅ Back"
+        "Telegram Number", "Lifetime RDP",
+        "Call Any Indian Number Free", "Make Own SMS Bomber",
+        "Own Temporary Mail Bot", "⬅ Back"
     )
     return markup
 
