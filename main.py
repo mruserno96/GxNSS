@@ -20,10 +20,12 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 BUCKET_NAME = os.getenv("BUCKET_NAME", "screenshots")
 ADMIN_IDS_RAW = os.getenv("ADMIN_TELEGRAM_IDS", "")
+UPLOAD_PREFIX = os.getenv("UPLOAD_FOLDER_PREFIX", "payments")
 
 if not BOT_TOKEN or not WEBHOOK_URL or not SUPABASE_URL or not SUPABASE_KEY:
     raise RuntimeError("❌ Missing required environment variables")
 
+# Admin IDs as int set
 ADMIN_IDS = set()
 for aid in ADMIN_IDS_RAW.split(","):
     aid = aid.strip()
@@ -32,8 +34,6 @@ for aid in ADMIN_IDS_RAW.split(","):
             ADMIN_IDS.add(int(aid))
         except ValueError:
             pass
-
-UPLOAD_PREFIX = os.getenv("UPLOAD_FOLDER_PREFIX", "payments")
 
 # -------------------------
 # Setup
@@ -49,7 +49,6 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # -------------------------
 UPI_ID = "MillionaireNaitik69@fam"
 QR_URL = "https://mruser96.42web.io/qr.jpg?nocache="
-
 COURSES_MSG = "📚 *GxNSS COURSES*\n\nCourses here..."
 PROMO_MSG = "🚀 *Huge Course Bundle – Just ₹79!*"
 PAY_INSTRUCTIONS = f"🔔 *Payment Instructions*\nUPI: `{UPI_ID}`\nUpload screenshot after payment."
@@ -87,10 +86,8 @@ def find_or_create_user(tid, username, fname=None, lname=None):
 def upload_to_supabase(bucket, path, file_bytes, content_type="image/jpeg"):
     path = path.lstrip("/")
     storage = supabase.storage.from_(bucket)
-    try:
-        storage.remove([path])
-    except Exception:
-        pass
+    try: storage.remove([path])
+    except: pass
     storage.upload(path, file_bytes, {"content-type": content_type})
     return path, storage.get_public_url(path)
 
@@ -159,20 +156,31 @@ def handle_upload(msg):
     notify_admins(f"🆕 Payment uploaded by @{msg.from_user.username or msg.from_user.id}\nUserID:{urow['id']}\nURL:{url}")
 
 # -------------------------
-# Admin Flow
+# Admin Flow (Fast + Pagination)
 # -------------------------
+def fetch_pending_payments(limit=50, page=1):
+    offset = (page-1)*limit
+    res = supabase.table("payments").select("*").order("created_at", desc=True).range(offset, offset+limit-1).execute()
+    rows = res.data or []
+    pending = [r for r in rows if not r.get("verified", False)]
+    return pending
+
 @bot.message_handler(commands=["allpayments"])
 def admin_allpayments(msg):
     if not is_admin(msg.from_user.id):
         return
-    rows = supabase.table("payments").select("*").order("created_at", desc=True).execute().data or []
-    pending = [r for r in rows if not r.get("verified", False)]
+    page = 1
+    if " " in msg.text:
+        try: page = int(msg.text.split()[1])
+        except: page=1
+    pending = fetch_pending_payments(limit=20, page=page)
     if not pending:
         bot.reply_to(msg, "✅ No pending payments.")
         return
-    text = "📂 *Pending Payments:*\n\n"
+    text = f"📂 *Pending Payments* (Page {page}):\n\n"
     for r in pending:
         text += f"UserID:{r['user_id']} | @{r.get('username','')}\nURL:{r['file_url']}\n\n"
+    text += "\nUse `/allpayments <page>` to see next page."
     bot.reply_to(msg, text.strip(), parse_mode="Markdown", disable_web_page_preview=True)
 
 @bot.message_handler(commands=["upgrade"])
@@ -185,7 +193,7 @@ def admin_upgrade(msg):
     user_row = (resp.data or [None])[0]
     if not user_row: return bot.reply_to(msg, "❌ User not found.")
     if user_row.get("status")=="premium": return bot.reply_to(msg, "✅ Already Premium")
-    supabase.table("users").update({"status":"premium"}).eq("id", user_row["id"]).execute()
+    supabase.table("users").update({"status":"premium","updated_at":datetime.utcnow().isoformat()}).eq("id", user_row["id"]).execute()
     supabase.table("payments").update({"verified":True}).eq("user_id", user_row["id"]).execute()
     notify_user_upgrade(user_row)
     bot.reply_to(msg, f"✅ User upgraded to Premium!")
@@ -201,7 +209,7 @@ def admin_allpremium(msg):
     bot.reply_to(msg,text.strip(),parse_mode="Markdown")
 
 # -------------------------
-# Flask Routes
+# Flask Webhook
 # -------------------------
 @app.route("/", methods=["GET"])
 def index(): return "Bot running",200
