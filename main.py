@@ -129,42 +129,42 @@ def is_admin(user_id: int) -> bool:
     return str(user_id) in ADMIN_TELEGRAM_IDS.split(",")
 
 
+# -------------------------
+# Message Tracking Helpers
+# -------------------------
+def save_message(user_id, chat_id, message_id):
+    try:
+        supabase.table("messages").insert({
+            "user_id": user_id,
+            "chat_id": chat_id,
+            "message_id": message_id
+        }).execute()
+    except Exception as e:
+        logger.error(f"❌ Failed to save message: {e}")
+
+
+def delete_old_messages(user_row):
+    rows = supabase.table("messages").select("*").eq("user_id", user_row["id"]).execute().data
+    for r in rows:
+        try:
+            bot.delete_message(r["chat_id"], r["message_id"])
+        except Exception:
+            pass
+    # clear from DB
+    supabase.table("messages").delete().eq("user_id", user_row["id"]).execute()
+
+
 def notify_user_upgrade(user_row):
     try:
-        bot.send_message(
+        delete_old_messages(user_row)
+        sent = bot.send_message(
             user_row["telegram_id"],
             "💲 We upgraded you to Premium User!\n\nClick /start to access your courses 🚀",
             parse_mode="Markdown"
         )
-    except Exception:
-        pass
-
-
-# -------------------------
-# Message Tracking
-# -------------------------
-def send_and_track(user_id, chat_id, text=None, photo=None, **kwargs):
-    if photo:
-        msg = bot.send_photo(chat_id, photo, caption=text, **kwargs)
-    else:
-        msg = bot.send_message(chat_id, text, **kwargs)
-
-    supabase.table("messages").insert({
-        "user_id": user_id,
-        "telegram_id": chat_id,
-        "message_id": msg.message_id
-    }).execute()
-    return msg
-
-
-def delete_user_messages(user_row):
-    rows = supabase.table("messages").select("*").eq("user_id", user_row["id"]).execute().data
-    for r in rows:
-        try:
-            bot.delete_message(r["telegram_id"], r["message_id"])
-        except Exception:
-            pass
-    supabase.table("messages").delete().eq("user_id", user_row["id"]).execute()
+        save_message(user_row["id"], user_row["telegram_id"], sent.message_id)
+    except Exception as e:
+        logger.error(f"❌ Failed to notify upgrade: {e}")
 
 
 # -------------------------
@@ -181,19 +181,21 @@ def send_welcome(message):
     )
 
     if user and user.get("status") == "premium":
-        send_and_track(user["id"], cid, text="🎉 Welcome back Premium User!\n\nHere is *Page 1* of your courses.", parse_mode="Markdown")
+        sent = bot.send_message(cid, "🎉 Welcome back Premium User!\n\nHere is *Page 1* of your courses.", parse_mode="Markdown")
+        save_message(user["id"], cid, sent.message_id)
         return
 
-    send_and_track(user["id"], cid, text=COURSES_MESSAGE, parse_mode="Markdown")
+    sent = bot.send_message(cid, COURSES_MESSAGE, parse_mode="Markdown")
+    save_message(user["id"], cid, sent.message_id)
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("Buy Course For ₹79", callback_data="buy"))
-    send_and_track(user["id"], cid, text=PROMO_MESSAGE, parse_mode="Markdown", reply_markup=markup)
+    sent2 = bot.send_message(cid, PROMO_MESSAGE, parse_mode="Markdown", reply_markup=markup)
+    save_message(user["id"], cid, sent2.message_id)
 
 
 @bot.callback_query_handler(func=lambda c: c.data == "buy")
 def handle_buy(call):
     cid = call.message.chat.id
-    user = supabase.table("users").select("*").eq("telegram_id", call.from_user.id).single().execute().data
     bot.answer_callback_query(call.id, "Preparing payment…")
 
     instr_markup = types.InlineKeyboardMarkup()
@@ -201,11 +203,16 @@ def handle_buy(call):
 
     caption = f"{PAYMENT_INSTRUCTIONS}\n\n👇 After payment, click the button below."
 
-    send_and_track(user["id"], cid,
-                   text=caption,
-                   photo=QR_IMAGE_URL + datetime.utcnow().strftime("%H%M%S"),
-                   parse_mode="Markdown",
-                   reply_markup=instr_markup)
+    sent = bot.send_photo(
+        cid,
+        QR_IMAGE_URL + datetime.utcnow().strftime("%H%M%S"),
+        caption=caption,
+        parse_mode="Markdown",
+        reply_markup=instr_markup
+    )
+    user = supabase.table("users").select("*").eq("telegram_id", call.from_user.id).single().execute().data
+    if user:
+        save_message(user["id"], cid, sent.message_id)
 
 
 @bot.callback_query_handler(func=lambda c: c.data == "i_paid")
@@ -213,7 +220,10 @@ def handle_paid(call):
     cid = call.message.chat.id
     supabase.table("users").update({"pending_upload": True}).eq("telegram_id", call.from_user.id).execute()
     bot.answer_callback_query(call.id, "Upload screenshot now")
-    send_and_track(None, cid, text="✅ Please upload your payment screenshot here.\n\nMake sure the screenshot clearly shows the transaction details.")
+    sent = bot.send_message(cid, "✅ Please upload your payment screenshot here.\n\nMake sure the screenshot clearly shows the transaction details.")
+    user = supabase.table("users").select("*").eq("telegram_id", call.from_user.id).single().execute().data
+    if user:
+        save_message(user["id"], cid, sent.message_id)
 
 
 @bot.message_handler(content_types=["photo", "document"])
@@ -250,9 +260,12 @@ def handle_upload(message):
 
     supabase.table("users").update({"pending_upload": False}).eq("telegram_id", user.id).execute()
 
-    send_and_track(urow["id"], message.chat.id,
-                   text="❤️‍🔥 Payment screenshot received!\n\nAdmin will verify your payment shortly. If approved, you'll be upgraded to Premium. 🚀",
-                   parse_mode="Markdown")
+    bot.send_message(
+        message.chat.id,
+        "❤️‍🔥 Payment screenshot received!\n\n"
+        "Admin will verify your payment shortly. If approved, you'll be upgraded to Premium. 🚀",
+        parse_mode="Markdown"
+    )
     notify_admins(f"🆕 Payment uploaded by @{user.username or user.id}\nUserID: {urow['id']}\nURL: {url}")
 
 
@@ -326,15 +339,7 @@ def admin_upgrade(message):
         supabase.table("payments").update({"verified": True}).eq("username", target).execute()
 
     if user_row:
-        # Delete old messages
-        delete_user_messages(user_row)
-
-        # Send fresh premium message
-        send_and_track(user_row["id"], user_row["telegram_id"],
-                       text="💎 Welcome to *Premium*! Here are your exclusive courses 🚀",
-                       parse_mode="Markdown")
-
-        bot.reply_to(message, f"✅ User {target} upgraded and old messages deleted!")
+        bot.reply_to(message, f"✅ User {target} upgraded to Premium!")
         notify_user_upgrade(user_row)
     else:
         bot.reply_to(message, f"❌ User {target} not found.")
@@ -375,7 +380,7 @@ def auto_ping():
                 logger.info("🔄 Auto-ping successful")
         except Exception as e:
             logger.warning(f"⚠️ Auto-ping failed: {e}")
-        time.sleep(300)  # 5 minutes
+        time.sleep(300)
 
 
 # -------------------------
