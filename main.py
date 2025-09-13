@@ -246,7 +246,8 @@ def admin_help(message):
     bot.reply_to(message, (
         "👮 *Admin Commands*\n\n"
         "/allpayments – View pending payments\n"
-        "/upgrade <userid|username> – Upgrade manually"
+        "/upgrade <userid|username> – Upgrade manually\n"
+        "/allpremiumuser – View all Premium users"
     ), parse_mode="Markdown")
 
 
@@ -262,6 +263,27 @@ def admin_allpayments(message):
     for r in rows:
         msg += f"UserID: {r['user_id']} | @{r.get('username','')}\nURL: {r['file_url']}\n\n"
     bot.reply_to(message, msg.strip(), parse_mode="Markdown", disable_web_page_preview=True)
+
+
+@bot.message_handler(commands=["allpremiumuser"])
+def admin_allpremiumuser(message):
+    if not is_admin(message.from_user.id):
+        return
+    rows = supabase.table("users").select("*").eq("status", "premium").execute().data or []
+    if not rows:
+        bot.reply_to(message, "❌ No Premium users found.")
+        return
+    msg = "💎 *Premium Users:*\n\n"
+    for u in rows:
+        msg += (
+            f"ID: {u.get('id')}\n"
+            f"TelegramID: {u.get('telegram_id')}\n"
+            f"Username: @{u.get('username') or 'N/A'}\n"
+            f"Name: {u.get('first_name','')} {u.get('last_name','')}\n"
+            f"Status: {u.get('status')}\n"
+            f"Created: {u.get('created_at')}\n\n"
+        )
+    bot.reply_to(message, msg.strip(), parse_mode="Markdown")
 
 
 @bot.message_handler(commands=["upgrade"])
