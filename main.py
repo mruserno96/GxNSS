@@ -1,5 +1,8 @@
 import os
 import logging
+import threading
+import time
+import requests
 from datetime import datetime
 
 from flask import Flask, request, abort
@@ -309,7 +312,22 @@ def telegram_webhook():
     return "OK", 200
 
 # -------------------------
+# Auto Ping (Prevent Sleep)
+# -------------------------
+def auto_ping():
+    while True:
+        try:
+            url = WEBHOOK_URL or ""
+            if url:
+                requests.get(url, timeout=10)
+                logger.info("🔄 Auto-ping successful")
+        except Exception as e:
+            logger.warning(f"⚠️ Auto-ping failed: {e}")
+        time.sleep(300)  # 5 minutes
+
+# -------------------------
 # Run Locally
 # -------------------------
 if __name__ == "__main__":
+    threading.Thread(target=auto_ping, daemon=True).start()
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
