@@ -29,7 +29,7 @@ UPLOAD_FOLDER_PREFIX = os.getenv("UPLOAD_FOLDER_PREFIX", "payments")
 # -------------------------
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-bot = telebot.TeleBot(BOT_TOKEN)
+bot = telebot.TeleBot(BOT_TOKEN, threaded=True, num_threads=5)
 app = Flask(__name__)
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -64,7 +64,7 @@ PAYMENT_INSTRUCTIONS = (
     f"🔔 *Payment Instructions*\n\n"
     f"UPI: `{UPI_ID}`\n\n"
     "1. Scan the QR or pay using the UPI above.\n"
-    "2. Upload your payment screenshot here.\n\n"
+    "2. Click *I Paid (Upload Screenshot)* below to upload proof.\n\n"
     "We’ll verify and grant access."
 )
 
@@ -91,12 +91,10 @@ def find_or_create_user(telegram_id, username, first_name=None, last_name=None):
 def upload_to_supabase(bucket, object_path, file_bytes, content_type="image/jpeg"):
     object_path = object_path.lstrip("/")
     storage = supabase.storage.from_(bucket)
-
     try:
         storage.remove([object_path])
     except Exception:
         pass
-
     storage.upload(object_path, file_bytes, {"content-type": content_type})
     return object_path, storage.get_public_url(object_path)
 
@@ -134,6 +132,11 @@ def notify_user_upgrade(user_row):
         )
     except Exception:
         pass
+
+# -------------------------
+# Track "I Paid" clicks
+# -------------------------
+pending_upload_users = set()
 
 # -------------------------
 # User Flow
@@ -180,6 +183,7 @@ def handle_buy(call):
 @bot.callback_query_handler(func=lambda c: c.data == "i_paid")
 def handle_paid(call):
     cid = call.message.chat.id
+    pending_upload_users.add(call.from_user.id)
     bot.answer_callback_query(call.id, "Upload screenshot now")
     bot.send_message(cid, "✅ Please upload your payment screenshot here.\n\nMake sure the screenshot clearly shows the transaction details.")
 
@@ -187,6 +191,11 @@ def handle_paid(call):
 @bot.message_handler(content_types=["photo", "document"])
 def handle_upload(message):
     user = message.from_user
+
+    if user.id not in pending_upload_users:
+        bot.reply_to(message, "⚠️ Please click *I Paid (Upload Screenshot)* before sending a screenshot.")
+        return
+
     urow = find_or_create_user(user.id, user.username or "", user.first_name or "", user.last_name or "")
 
     try:
@@ -212,6 +221,9 @@ def handle_upload(message):
     except Exception:
         bot.reply_to(message, "❌ Failed to record your payment. Please try again.")
         return
+
+    # success → remove from pending
+    pending_upload_users.discard(user.id)
 
     bot.send_message(
         message.chat.id,
@@ -240,7 +252,7 @@ def admin_allpayments(message):
     if not is_admin(message.from_user.id):
         return
     rows = supabase.table("payments").select("*").eq("verified", False).execute().data or []
-    if len(rows) == 0:
+    if not rows:
         bot.reply_to(message, "✅ No pending payments.")
         return
     msg = "📂 *Pending Payments:*\n\n"
@@ -260,14 +272,19 @@ def admin_upgrade(message):
     target = args[1]
 
     if target.isdigit():
-        user_row = supabase.table("users").update({"status": "premium"}).eq("id", target).execute().data[0]
+        data = supabase.table("users").update({"status": "premium"}).eq("id", target).execute().data
+        user_row = data[0] if data else None
         supabase.table("payments").update({"verified": True}).eq("user_id", target).execute()
     else:
-        user_row = supabase.table("users").update({"status": "premium"}).eq("username", target).execute().data[0]
+        data = supabase.table("users").update({"status": "premium"}).eq("username", target).execute().data
+        user_row = data[0] if data else None
         supabase.table("payments").update({"verified": True}).eq("username", target).execute()
 
-    bot.reply_to(message, f"✅ User {target} upgraded to Premium!")
-    notify_user_upgrade(user_row)
+    if user_row:
+        bot.reply_to(message, f"✅ User {target} upgraded to Premium!")
+        notify_user_upgrade(user_row)
+    else:
+        bot.reply_to(message, f"❌ User {target} not found.")
 
 # -------------------------
 # Flask Routes
