@@ -142,7 +142,7 @@ def create_payment(user_row, file_path, file_url, username):
         "username": username,
         "file_path": file_path,
         "file_url": file_url,
-        "verified": False,  # always store as proper boolean
+        "verified": False,
         "created_at": datetime.utcnow().isoformat(),
     }
     res = supabase.table("payments").insert(payload).execute()
@@ -299,42 +299,9 @@ def admin_help(message):
         return
     bot.reply_to(message, (
         "👮 *Admin Commands*\n\n"
-        "/allpayments – View pending payments\n"
         "/upgrade <userid|username> – Upgrade manually\n"
         "/allpremiumuser – View all Premium users"
     ), parse_mode="Markdown")
-
-
-@bot.message_handler(commands=["allpayments"])
-def admin_allpayments(message):
-    if not is_admin(message.from_user.id):
-        return
-
-    try:
-        res = supabase.table("payments").select("*").order("created_at", desc=True).limit(200).execute()
-        rows = res.data or []
-    except Exception:
-        bot.reply_to(message, "❌ Failed to fetch payments from DB.")
-        return
-
-    # Filter pending manually
-    pending = []
-    for r in rows:
-        v = r.get("verified")
-        if v in (False, None, 0, "0", "false", "False"):
-            pending.append(r)
-
-    if not pending:
-        bot.reply_to(message, "✅ No pending payments.")
-        return
-
-    msg_lines = ["📂 *Pending Payments:*", ""]
-    for r in pending:
-        msg_lines.append(f"UserID: {r.get('user_id')} | @{r.get('username','')}")
-        msg_lines.append(f"URL: {r.get('file_url')}")
-        msg_lines.append("")
-
-    bot.reply_to(message, "\n".join(msg_lines).strip(), parse_mode="Markdown", disable_web_page_preview=True)
 
 
 @bot.message_handler(commands=["allpremiumuser"])
