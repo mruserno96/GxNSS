@@ -84,6 +84,7 @@ def find_or_create_user(telegram_id, username, first_name=None, last_name=None):
         "first_name": first_name,
         "last_name": last_name,
         "status": "normal",
+        "pending_upload": False,  # <-- Option 1 column
         "created_at": datetime.utcnow().isoformat(),
         "updated_at": datetime.utcnow().isoformat(),
     }
@@ -123,8 +124,10 @@ def notify_admins(text):
         except Exception:
             pass
 
+
 def is_admin(user_id: int) -> bool:
     return str(user_id) in ADMIN_TELEGRAM_IDS.split(",")
+
 
 def notify_user_upgrade(user_row):
     try:
@@ -136,10 +139,6 @@ def notify_user_upgrade(user_row):
     except Exception:
         pass
 
-# -------------------------
-# Track "I Paid" clicks
-# -------------------------
-pending_upload_users = set()
 
 # -------------------------
 # User Flow
@@ -186,7 +185,8 @@ def handle_buy(call):
 @bot.callback_query_handler(func=lambda c: c.data == "i_paid")
 def handle_paid(call):
     cid = call.message.chat.id
-    pending_upload_users.add(call.from_user.id)
+    # Update DB column instead of memory set
+    supabase.table("users").update({"pending_upload": True}).eq("telegram_id", call.from_user.id).execute()
     bot.answer_callback_query(call.id, "Upload screenshot now")
     bot.send_message(cid, "✅ Please upload your payment screenshot here.\n\nMake sure the screenshot clearly shows the transaction details.")
 
@@ -194,12 +194,11 @@ def handle_paid(call):
 @bot.message_handler(content_types=["photo", "document"])
 def handle_upload(message):
     user = message.from_user
-
-    if user.id not in pending_upload_users:
+    # Fetch latest user state
+    urow = supabase.table("users").select("*").eq("telegram_id", user.id).single().execute().data
+    if not urow or not urow.get("pending_upload"):
         bot.reply_to(message, "⚠️ Please click *I Paid (Upload Screenshot)* before sending a screenshot.")
         return
-
-    urow = find_or_create_user(user.id, user.username or "", user.first_name or "", user.last_name or "")
 
     try:
         fid = message.photo[-1].file_id if message.content_type == "photo" else message.document.file_id
@@ -225,8 +224,8 @@ def handle_upload(message):
         bot.reply_to(message, "❌ Failed to record your payment. Please try again.")
         return
 
-    # success → remove from pending
-    pending_upload_users.discard(user.id)
+    # success → update DB pending_upload
+    supabase.table("users").update({"pending_upload": False}).eq("telegram_id", user.id).execute()
 
     bot.send_message(
         message.chat.id,
@@ -235,6 +234,7 @@ def handle_upload(message):
         parse_mode="Markdown"
     )
     notify_admins(f"🆕 Payment uploaded by @{user.username or user.id}\nUserID: {urow['id']}\nURL: {url}")
+
 
 # -------------------------
 # Admin Flow
@@ -311,6 +311,7 @@ def admin_upgrade(message):
     else:
         bot.reply_to(message, f"❌ User {target} not found.")
 
+
 # -------------------------
 # Flask Routes
 # -------------------------
@@ -333,6 +334,7 @@ def telegram_webhook():
     bot.process_new_updates([update])
     return "OK", 200
 
+
 # -------------------------
 # Auto Ping (Prevent Sleep)
 # -------------------------
@@ -346,6 +348,7 @@ def auto_ping():
         except Exception as e:
             logger.warning(f"⚠️ Auto-ping failed: {e}")
         time.sleep(300)  # 5 minutes
+
 
 # -------------------------
 # Run Locally
