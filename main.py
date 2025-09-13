@@ -90,7 +90,6 @@ def is_admin(user_id: int) -> bool:
     except Exception:
         return False
 
-
 def notify_admins(text):
     if not ADMIN_IDS:
         return
@@ -100,17 +99,14 @@ def notify_admins(text):
         except Exception:
             pass
 
-
 def find_or_create_user(telegram_id, username, first_name=None, last_name=None):
     try:
         telegram_id = int(telegram_id)
     except Exception:
         pass
-
     resp = supabase.table("users").select("*").eq("telegram_id", telegram_id).limit(1).execute()
     if resp.data:
         return resp.data[0]
-
     new_user = {
         "telegram_id": telegram_id,
         "username": username,
@@ -124,7 +120,6 @@ def find_or_create_user(telegram_id, username, first_name=None, last_name=None):
     ins = supabase.table("users").insert(new_user).execute()
     return ins.data[0] if ins.data else None
 
-
 def upload_to_supabase(bucket, object_path, file_bytes, content_type="image/jpeg"):
     object_path = object_path.lstrip("/")
     storage = supabase.storage.from_(bucket)
@@ -134,7 +129,6 @@ def upload_to_supabase(bucket, object_path, file_bytes, content_type="image/jpeg
         pass
     storage.upload(object_path, file_bytes, {"content-type": content_type})
     return object_path, storage.get_public_url(object_path)
-
 
 def create_payment(user_row, file_path, file_url, username):
     payload = {
@@ -148,7 +142,6 @@ def create_payment(user_row, file_path, file_url, username):
     res = supabase.table("payments").insert(payload).execute()
     return res.data[0] if res.data else None
 
-
 def save_message(user_id, chat_id, message_id):
     try:
         supabase.table("messages").insert({
@@ -159,7 +152,6 @@ def save_message(user_id, chat_id, message_id):
     except Exception:
         pass
 
-
 def delete_old_messages(user_row):
     rows = supabase.table("messages").select("*").eq("user_id", user_row["id"]).execute().data
     for r in rows:
@@ -168,7 +160,6 @@ def delete_old_messages(user_row):
         except Exception:
             pass
     supabase.table("messages").delete().eq("user_id", user_row["id"]).execute()
-
 
 def notify_user_upgrade(user_row):
     try:
@@ -183,7 +174,57 @@ def notify_user_upgrade(user_row):
         pass
 
 # -------------------------
-# User Flow
+# Premium Menu Keyboards
+# -------------------------
+def main_menu_keyboard():
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
+    markup.add(
+        "🔹 Programming Courses",
+        "🔹 Hacking & Cybersecurity Courses",
+        "🔹 System & OS Courses",
+        "🔹 Special Cyber Tools Courses",
+        "🔹 Premium Courses Bundle (31 Paid Courses)"
+    )
+    return markup
+
+def programming_courses_keyboard():
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    markup.add("C++", "Java", "JavaScript", "Python", "⬅ Back")
+    return markup
+
+def hacking_courses_keyboard():
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    markup.add(
+        "BlackHat Hacking", "Ethical Hacking", "Android Hacking", "WiFi Hacking",
+        "Binning (by BlackHat)", "Antivirus Development", "Phishing App Development",
+        "PUBG Hack Development", "APK Modding (20+ Courses)", "⬅ Back"
+    )
+    return markup
+
+def system_os_courses_keyboard():
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    markup.add("Linux", "PowerShell", "⬅ Back")
+    return markup
+
+def special_tools_courses_keyboard():
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    markup.add(
+        "How to Make Telegram Number", "How to Make Lifetime RDP",
+        "How to Call Any Indian Number Free", "How to Make Own SMS Bomber",
+        "How to Make Own Temporary Mail Bot", "⬅ Back"
+    )
+    return markup
+
+def premium_courses_keyboard():
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    markup.add(
+        "Cyber Security", "Python", "Machine Learning", "Pro Music Production",
+        "Photoshop CC", "⬅ Back"
+    )
+    return markup
+
+# -------------------------
+# /start handler
 # -------------------------
 @bot.message_handler(commands=["start"])
 def send_welcome(message):
@@ -196,10 +237,11 @@ def send_welcome(message):
     )
 
     if user and user.get("status") == "premium":
-        sent = bot.send_message(cid, "🎉 Welcome back Premium User!\n\nHere is *Page 1* of your courses.", parse_mode="Markdown")
-        save_message(user["id"], cid, sent.message_id)
+        bot.send_message(cid, "🎉 Welcome back Premium User!\n\nSelect a category to view courses:", 
+                         reply_markup=main_menu_keyboard())
         return
 
+    # Normal users
     sent = bot.send_message(cid, COURSES_MESSAGE, parse_mode="Markdown")
     save_message(user["id"], cid, sent.message_id)
     markup = types.InlineKeyboardMarkup()
@@ -207,164 +249,56 @@ def send_welcome(message):
     sent2 = bot.send_message(cid, PROMO_MESSAGE, parse_mode="Markdown", reply_markup=markup)
     save_message(user["id"], cid, sent2.message_id)
 
+# -------------------------
+# Premium Menu Handler
+# -------------------------
+@bot.message_handler(func=lambda message: True)
+def handle_menu(message):
+    text = message.text
+    chat_id = message.chat.id
 
-@bot.callback_query_handler(func=lambda c: c.data == "buy")
-def handle_buy(call):
-    cid = call.message.chat.id
-    bot.answer_callback_query(call.id, "Preparing payment…")
+    # Only premium users can access the menu
+    uresp = supabase.table("users").select("*").eq("telegram_id", message.from_user.id).single().execute()
+    user_row = uresp.data
+    if not user_row or user_row.get("status") != "premium":
+        return  # ignore non-premium
 
-    instr_markup = types.InlineKeyboardMarkup()
-    instr_markup.add(types.InlineKeyboardButton("I Paid (Upload Screenshot)", callback_data="i_paid"))
+    if text == "🔹 Programming Courses":
+        bot.send_message(chat_id, "Select a course:", reply_markup=programming_courses_keyboard())
+    elif text == "🔹 Hacking & Cybersecurity Courses":
+        bot.send_message(chat_id, "Select a course:", reply_markup=hacking_courses_keyboard())
+    elif text == "🔹 System & OS Courses":
+        bot.send_message(chat_id, "Select a course:", reply_markup=system_os_courses_keyboard())
+    elif text == "🔹 Special Cyber Tools Courses":
+        bot.send_message(chat_id, "Select a course:", reply_markup=special_tools_courses_keyboard())
+    elif text == "🔹 Premium Courses Bundle (31 Paid Courses)":
+        bot.send_message(chat_id, "Select a course:", reply_markup=premium_courses_keyboard())
+    
+    elif text == "⬅ Back":
+        bot.send_message(chat_id, "Main Menu:", reply_markup=main_menu_keyboard())
 
-    caption = f"{PAYMENT_INSTRUCTIONS}\n\n👇 After payment, click the button below."
-
-    sent = bot.send_photo(
-        cid,
-        QR_IMAGE_URL + datetime.utcnow().strftime("%H%M%S"),
-        caption=caption,
-        parse_mode="Markdown",
-        reply_markup=instr_markup
-    )
-    user = supabase.table("users").select("*").eq("telegram_id", call.from_user.id).single().execute().data
-    if user:
-        save_message(user["id"], cid, sent.message_id)
-
-
-@bot.callback_query_handler(func=lambda c: c.data == "i_paid")
-def handle_paid(call):
-    cid = call.message.chat.id
-    supabase.table("users").update({"pending_upload": True}).eq("telegram_id", call.from_user.id).execute()
-    bot.answer_callback_query(call.id, "Upload screenshot now")
-    sent = bot.send_message(cid, "✅ Please upload your payment screenshot here.\n\nMake sure the screenshot clearly shows the transaction details.")
-    user = supabase.table("users").select("*").eq("telegram_id", call.from_user.id).single().execute().data
-    if user:
-        save_message(user["id"], cid, sent.message_id)
-
-
-@bot.message_handler(content_types=["photo", "document"])
-def handle_upload(message):
-    user = message.from_user
-    try:
-        t_id = int(user.id)
-    except Exception:
-        t_id = user.id
-
-    uresp = supabase.table("users").select("*").eq("telegram_id", t_id).single().execute()
-    urow = uresp.data
-    if not urow or not urow.get("pending_upload"):
-        bot.reply_to(message, "⚠️ Please click *I Paid (Upload Screenshot)* before sending a screenshot.", parse_mode="Markdown")
-        return
-
-    try:
-        fid = message.photo[-1].file_id if message.content_type == "photo" else message.document.file_id
-        file_info = bot.get_file(fid)
-        file_bytes = bot.download_file(file_info.file_path)
-    except Exception:
-        bot.reply_to(message, "❌ Failed to download your screenshot. Please try again.")
-        return
-
-    ts = datetime.utcnow().strftime("%Y%m%dT%H%M%S")
-    ext = os.path.splitext(file_info.file_path)[1] or ".jpg"
-    object_path = f"{UPLOAD_FOLDER_PREFIX}/{user.id}_{ts}{ext}"
-
-    try:
-        _, url = upload_to_supabase(BUCKET_NAME, object_path, file_bytes)
-    except Exception as e:
-        bot.reply_to(message, f"❌ Upload failed. Error: {e}")
-        return
-
-    try:
-        create_payment(urow, object_path, url, user.username or "")
-    except Exception:
-        bot.reply_to(message, "❌ Failed to record your payment. Please try again.")
-        return
-
-    supabase.table("users").update({"pending_upload": False}).eq("telegram_id", user.id).execute()
-
-    bot.send_message(
-        message.chat.id,
-        "❤️‍🔥 Payment screenshot received!\n\n"
-        "Admin will verify your payment shortly. If approved, you'll be upgraded to Premium. 🚀",
-        parse_mode="Markdown"
-    )
-    notify_admins(f"🆕 Payment uploaded by @{user.username or user.id}\nUserID: {urow.get('id')}\nURL: {url}")
-
+    else:
+        course_links = {
+            "C++": "https://link_to_cpp_course",
+            "Java": "https://link_to_java_course",
+            "Python": "https://link_to_python_course",
+            "BlackHat Hacking": "https://link_to_blackhat_course",
+            "Ethical Hacking": "https://link_to_ethical_course",
+            "Linux": "https://link_to_linux_course",
+            "Cyber Security": "https://link_to_cyber_course",
+            # Add all courses here...
+        }
+        link = course_links.get(text)
+        if link:
+            bot.send_message(chat_id, f"Here is your course: {link}")
 
 # -------------------------
-# Admin Flow
+# Payment Handlers
 # -------------------------
-@bot.message_handler(commands=["admin"])
-def admin_help(message):
-    if not is_admin(message.from_user.id):
-        return
-    bot.reply_to(message, (
-        "👮 *Admin Commands*\n\n"
-        "/upgrade <userid|username> – Upgrade manually\n"
-        "/allpremiumuser – View all Premium users"
-    ), parse_mode="Markdown")
-
-
-@bot.message_handler(commands=["allpremiumuser"])
-def admin_allpremiumuser(message):
-    if not is_admin(message.from_user.id):
-        return
-    rows = supabase.table("users").select("*").eq("status", "premium").execute().data or []
-    if not rows:
-        bot.reply_to(message, "❌ No Premium users found.")
-        return
-    msg = "💎 *Premium Users:*\n\n"
-    for u in rows:
-        msg += (
-            f"ID: {u.get('id')}\n"
-            f"TelegramID: {u.get('telegram_id')}\n"
-            f"Username: @{u.get('username') or 'N/A'}\n"
-            f"Name: {u.get('first_name','')} {u.get('last_name','')}\n"
-            f"Status: {u.get('status')}\n"
-            f"Created: {u.get('created_at')}\n\n"
-        )
-    bot.reply_to(message, msg.strip(), parse_mode="Markdown")
-
-
-@bot.message_handler(commands=["upgrade"])
-def admin_upgrade(message):
-    if not is_admin(message.from_user.id):
-        return
-
-    args = message.text.split()
-    if len(args) < 2:
-        bot.reply_to(message, "Usage: /upgrade <user_id|username>")
-        return
-    target = args[1]
-
-    try:
-        if target.isdigit():
-            resp = supabase.table("users").select("*").eq("id", int(target)).limit(1).execute()
-        else:
-            username_lookup = target.lstrip("@")
-            resp = supabase.table("users").select("*").eq("username", username_lookup).limit(1).execute()
-    except Exception:
-        bot.reply_to(message, "❌ Database error while searching for user.")
-        return
-
-    user_row = (resp.data or [None])[0]
-    if not user_row:
-        bot.reply_to(message, f"❌ User {target} not found.")
-        return
-
-    if user_row.get("status") == "premium":
-        bot.reply_to(message, f"✅ User {target} is already Premium.")
-        return
-
-    try:
-        supabase.table("users").update({"status": "premium", "updated_at": datetime.utcnow().isoformat()}).eq("id", user_row["id"]).execute()
-        supabase.table("payments").update({"verified": True}).eq("user_id", user_row["id"]).execute()
-    except Exception:
-        bot.reply_to(message, f"❌ Failed to upgrade {target}.")
-        return
-
-    notify_user_upgrade(user_row)
-    bot.reply_to(message, f"✅ User {target} upgraded to Premium!")
-
+# [Keep all your existing handle_buy, handle_paid, handle_upload functions as-is]
+# -------------------------
+# Admin Handlers
+# [Keep all your admin /upgrade and /allpremiumuser functions as-is]
 
 # -------------------------
 # Flask Routes
@@ -388,7 +322,6 @@ def telegram_webhook():
     bot.process_new_updates([update])
     return "OK", 200
 
-
 # -------------------------
 # Auto Ping
 # -------------------------
@@ -400,7 +333,6 @@ def auto_ping():
         except Exception:
             pass
         time.sleep(300)
-
 
 # -------------------------
 # Run Locally
