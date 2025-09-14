@@ -57,7 +57,7 @@ COURSES_MESSAGE = (
     "C++\nJava\nJavaScript\nPython\n\n"
     "🔹 *Hacking & Cybersecurity Courses*\n"
     "BlackHat Hacking\nEthical Hacking\nAndroid Hacking\nWiFi Hacking\n"
-    "Binning (by BlackHat)\nAntivirus Development\nPhishing App Development\nPUBG Hack Development\nAPK Modding (20+ Courses)\n\n"
+    "Binning (by BlackHat)\nPhishing App Development\nPUBG Hack Development\nAPK Modding (20+ Courses)\n\n"
     "🔹 *System & OS Courses*\n"
     "Linux\nPowerShell\n\n"
     "🔹 *Special Cyber Tools Courses*\n"
@@ -232,7 +232,7 @@ def hacking_courses_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     markup.add(
         "BlackHat Hacking", "Ethical Hacking", "Android Hacking", "WiFi Hacking",
-        "Binning (by BlackHat)", "Antivirus Development", "Phishing App Development",
+        "Binning (by BlackHat)", "Phishing App Development",
         "PUBG Hack Development", "APK Modding 20+ Course", "⬅ Back"
     )
     return markup
@@ -242,11 +242,16 @@ def system_os_courses_keyboard():
     markup.add("Linux", "PowerShell", "⬅ Back")
     return markup
 
-def premium_courses_keyboard():
+
+def special_tools_courses_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     markup.add(
-        "Cyber Security", "Python", "Machine Learning", "Pro Music Production",
-        "Photoshop CC", "⬅ Back"
+        "How to Make Telegram Number",
+        "How to Make Lifetime RDP",
+        "How to Call Any Indian Number Free",
+        "How to Make Own SMS Bomber",
+        "How to Make Own Temporary Mail Bot",
+        "⬅ Back"
     )
     return markup
 
