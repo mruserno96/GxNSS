@@ -539,7 +539,9 @@ COURSE_DATA = {
             "🚩 Learn C++ from an experienced university full professor who has been using and teaching C++ for more than 25 years.\n\n"
             "🚩 Includes Quizzes, Live Coding Exercises, Challenge Coding Exercises and Assignments.\n\n"
             "👥 Size:-) 2.44 GB\n"
-            "⏳ Time:-) 31:07:29"
+            "⏳ Time:-) 31:07:29\n"
+                         "💡 Credit: @WinTheBetWithMe , @Paise_wala69"
+
         ),
         "link": "https://drive.google.com/file/d/1Ur5T9dGb_e5EBNJzpTg08ieSHKxwBoeQ/view"
     },
@@ -549,7 +551,9 @@ COURSE_DATA = {
         "📘 Exclusive JAVA Learning PDFs\n"
         "Level up your coding skills with these high-quality resources – perfect for beginners to advanced learners.\n\n"
         "⏳ Length: 12:00:00\n"
-        "💾 Size: 1.38 GB"
+        "💾 Size: 1.38 GB\n"
+                     "💡 Credit: @WinTheBetWithMe , @Paise_wala69"
+
     ),
     "link": "https://drive.google.com/file/d/1U_yVhz5sJwXtYdgZfo_D_Kb4usSDe7YF/view"
 },
@@ -558,7 +562,9 @@ COURSE_DATA = {
         "🐍 Python Full Course 2025 🚀\n\n"
         "🔥 Master Python programming from scratch – perfect for beginners to advanced learners!\n\n"
         "⏳ Length: 12:00:00\n"
-        "💾 Size: 1.44 GB"
+        "💾 Size: 1.44 GB\n"
+                     "💡 Credit: @WinTheBetWithMe , @Paise_wala69"
+
     ),
     "link": "https://drive.google.com/file/d/1CXMjGRsANgEYFgXOOQMVz0RazKzbBArz/view"
 },
@@ -567,7 +573,9 @@ COURSE_DATA = {
         "🚀 The Complete JavaScript Course 2025: From Zero to Expert! 💻\n\n"
         "🔥 Learn JavaScript like a pro – from the absolute basics to advanced concepts, all in one course!\n\n"
         "⏳ Length: 12:00:00\n"
-        "💾 Size: 1.48 GB"
+        "💾 Size: 1.48 GB\n"
+     "💡 Credit: @WinTheBetWithMe , @Paise_wala69"
+
     ),
     "link": "https://drive.google.com/file/d/1MbkUaXVsmcnR_7n5H12F0-DcI83NIYSy/view?usp=drive_link"
 },
@@ -577,7 +585,9 @@ COURSE_DATA = {
         "🔥 Learn the dark side of cybersecurity – from the basics to advanced hacking techniques!\n\n"
         "⏳ Length: 05:04:30\n"
         "💾 Size: 516 MB\n\n"
-        "✨ Support & Share this Bot to help us grow! ❤️"
+        "✨ Support & Share this Bot to help us grow! ❤️\n"
+                     "💡 Credit: @WinTheBetWithMe , @Paise_wala69"
+
     ),
     "link": "https://drive.google.com/file/d/1tU96CXdNJyCAKFgN8GvyV9oPiizVKIgm/view"
 },
@@ -587,7 +597,9 @@ COURSE_DATA = {
         "🔥 Master automation and scripting with PowerShell – from fundamentals to advanced techniques!\n\n"
         "⏳ Length: 03:00:01\n"
         "💾 Size: 800 MB\n\n"
-        "✨ Support & Share this Bot to help us grow! ❤️"
+        "✨ Support & Share this Bot to help us grow! ❤️\n"
+      "💡 Credit: @WinTheBetWithMe , @Paise_wala69"
+
     ),
     "link": "https://drive.google.com/file/d/1VmOkMbujab1ogkPC3k9t24ws2nu1nfJH/view"
 },
@@ -596,7 +608,8 @@ COURSE_DATA = {
         "🐧 Linux Mastery Course 2025 💻\n\n"
         "🔥 Become a Linux pro – from beginner essentials to advanced system administration!\n\n"
         "⏳ Length: 07:53:22\n"
-        "💾 Size: 1.29 GB\n\n"
+        "💾 Size: 1.29 GB\n"
+      "💡 Credit: @WinTheBetWithMe , @Paise_wala69\n"
         "✨ Support & Share this Bot to help us grow! ❤️"
     ),
     "link": "https://drive.google.com/file/d/1gG3lCo_jqhRTAr7MXkrs6QqO6RPqiZCE/view"
@@ -653,6 +666,165 @@ COURSE_DATA = {
   ),
     "link": "https://drive.google.com/drive/folders/11dqpULb1h14jyoZeSwsAo_bd3XN4t602"
 },
+
+"WiFi Hacking":{
+   "description": (
+              "💢 WiFi Hacking Course in Hindi 💢\n\n"
+        "📍 What you'll learn :-\n\n"
+        "🌀 Students will get the intermediate knowledge of Kali Linux and learn to crack passwords of vulnerable WiFi routers.\n\n"
+        "🌀 Attacks before gaining access to router and hiding your identity in the process.\n\n"
+        "🌀 Various methods to gain access to router.\n\n"
+        "🤓 Who this course is for:-\n"
+        "1. Anyone who wants to learn professional wireless hacking.\n"
+        "2. Penetration testing or WiFi hacking just for fun.\n\n"
+             "💡 Credit: @WinTheBetWithMe , @Paise_wala69"
+  ),
+    "link": "https://drive.google.com/folderview?id=1tgkKt4lSpXD3GnMQRgUb4bbtlmpP9XOE"
+},
+
+"Ethical Hacking":{
+   "description": (
+                "🔰 ETHICAL HACKING COURSE 🔰\n"
+                "🌀 Language ~ Hindi\n"
+                "🌀 Content - 20 Folders, 80+ videos\n"
+                "Password: ###gr3y@n0n###\n\n"
+             "💡 Credit: @WinTheBetWithMe , @Paise_wala69"
+  ),
+    "link": "http://www.mediafire.com/file/qiax38wizsnj8zm/HACK2ED+-+Tech+Vansh.rar/file"
+},
+
+"Phishing App Development":{
+   "description": (
+       
+       "This is Zpisher Famous Phishing Tool\n"
+       "apt update\n"
+       "apt upgrade\n"
+       "apt install git php openssh curl -y\n"
+       "git clone https://github.com/htr-tech/zphisher\n"
+       "cd zphisher\n"
+       "chmod +x zphisher.sh (https://zphisher.sh/)\n"
+       "bash zphisher.sh (https://zphisher.sh/)\n"
+       "run\n"
+       "cd zphisher\n"
+       "bash zphisher.sh (https://zphisher.sh/)\n\n"
+        "💡 Credit: @WinTheBetWithMe , @Paise_wala69"
+  ),
+    "link": "https://github.com/htr-tech/zphisher"
+},
+
+"APK Modding 20+ Course":{
+   "description": (
+                  "📱 APK Modding & Game Guardian Masterclass\n\n"
+        "💻 Learn to Create, Modify, and Secure Android Apps & Games!\n\n"
+        "📚 APK Making Course\n"
+        "🎬 Beginner to Advanced Tutorials\n\n"
+        "1️⃣ Part 1 – Basics About Apps\n"
+        "2️⃣ Part 2 – Introduction to Sketchware\n"
+        "3️⃣ Part 3 – UI Design for Log Cleaner APK\n"
+        "4️⃣ Part 4 – Designing Progress (Stage 2)\n"
+        "5️⃣ Part 5 – Designing Progress (Stage 3)\n"
+        "6️⃣ Part 6 – Final UI Design\n"
+        "7️⃣ Part 7 – Root Permission Integration\n"
+        "8️⃣ Part 8 – Login System Setup\n"
+        "9️⃣ Parts 9 & 10 – Log Cleaner APK Final Build\n\n"
+        "🛡 Antiban APK Tutorials\n"
+        "1️⃣ Part 11 – Antiban APK Basic Setup\n"
+        "2️⃣ Part 12 – UI Improvement Techniques\n"
+        "3️⃣ Part 13 – Firebase Authentication\n"
+        "4️⃣ Part 14 – One Device Login System\n"
+        "5️⃣ Part 15 – Custom Dialog Box Design\n"
+        "6️⃣ Part 16 – Home Page Setup\n"
+        "7️⃣ Part 17 – Save & Load Key Functionality\n"
+        "8️⃣ Part 18 – In-Build Injector with Sketchware\n"
+        "9️⃣ Part 19 – Floating Icon Injector (Sketchware)\n\n"
+        "🖥 CPP Making Tutorial\n"
+        "Complete Guide to CPP APK Development (First & Final Video)\n\n"
+        "🎮 Game Guardian Mastery\n"
+        "🔍 Game Guardian Basics\n"
+        "Part 1 – Features & Value Finding\n\n"
+        "🧩 Game Guardian Script Making\n"
+        "1️⃣ Part 1 – Basic Commands & Lua Scripting\n"
+        "2️⃣ Part 2 – Completing the Script\n"
+        "3️⃣ Part 3 – Memory Antiban Creation\n"
+        "4️⃣ Part 4 – Fast Execution Script (XS Script)\n\n"
+        "⚡ Final Advanced Guide\n"
+        "Game Guardian Script Final Part – Encryption & Online Deployment\n\n"
+        "🔗 All Course Links\n"
+        "📥 All video links are combined in one single file for easy access!\n\n"
+             "💡 Credit: @WinTheBetWithMe , @Paise_wala69"
+  ),
+    "link": "https://pastebin.com/raw/RmnWccvp"
+},
+
+"How to Make Telegram Number":{
+   "description": (
+                "📲 How To Make Unlimited Numbers for Telegram or WhatsApp\n\n"
+        "💡 Follow the method carefully to generate multiple working numbers.\n\n"
+        "⭐ Watch the full video carefully to learn the method step by step.\n\n"
+        "🛡 Enjoy and use responsibly!\n\n"
+             "💡 Credit: @WinTheBetWithMe , @Paise_wala69"
+  ),
+    "link": "https://drive.google.com/file/d/1VoQYPQU2weBfhZJsMe5sHInO9HJTwSwK/view"
+},
+
+"How to Make Lifetime RDP":{
+   "description": (
+       "☠️ How To Make Lifetime RDP For Free\n\n1."
+   " First Go On Chrome And Open This Website - rdphostings.com\n"
+   "2. Select Windows RDP\n"
+   "3. Select Plan - Solo Server / Expert Server ( We Prefer Expert Server )\n"
+   "4. And Then Buy it at Zero (0$) Cost , No Need To Give Any Card Details.\n"
+   "5. Fill All Real Information Of Your's.\n"
+   "6. Verify Gmail By Click On Link Which Is Send By rdphostings.com On Your Gmail Account.\n"
+   "7. Wait 24 Hours.\n"
+   "8. You Will Get Your Username And Ip on Your Gmail. And you will also get the password from Gmail itself.\n\n"
+   "And if you want to use rdp in mobile then you have to install one app. App Name is ( RD Clients )\n\n"
+   "Tip - iF You Need High Speed Internet Then Select Linux Solo Server, Speed Upto 500Mbps 😱\n\n"
+             "💡 Credit: @WinTheBetWithMe , @Paise_wala69"
+  ),
+    "link": "rdphostings.com"
+},
+
+"How to Call Any Indian Number Free":{
+   "description": (
+        "📞 UNLIMITED CALLS ANY INDIAN NUMBERS FOR FREE\n\n"
+        "New App Trick / Method\n\n"
+        "Any Indian Numbers Call fake number 30 Days Trial\n"
+        "Get many times trials trick leaked by hacker Alok\n"
+        "Call any Indian number for free using this trick.\n\n"
+             "💡 Credit: @WinTheBetWithMe , @Paise_wala69"
+  ),
+    "link": "https://drive.google.com/file/d/1_1qgSlxSFOshlkXaoFtcWq2G1_JTPtxX/view"
+},
+
+"How to Make Own SMS Bomber":{
+   "description": (
+       "💥 CREATE YOUR OWN SMS BOMBER 💥\n\n"
+        "🚀 Learn step-by-step how to make a powerful SMS Bomber tool from scratch.\n\n"
+        "🎬 VIDEO COURSE LINK INCLUDED\n\n"
+        "💡 What You Will Learn:\n"
+        "1️⃣ Fundamentals of SMS bombing scripts and techniques.\n"
+        "2️⃣ How to safely test your tool without breaking laws.\n"
+        "3️⃣ Integrating APIs for bulk SMS sending.\n"
+        "4️⃣ Adding stylish features and customizations.\n"
+        "5️⃣ Protecting your tool from detection.\n\n"
+        "⚠️ WARNING: Use responsibly! Only for educational purposes.\n\n"
+        "✨ Credit: @WinTheBetWithMe , @Paise_wala69"
+  ),
+    "link": "https://drive.google.com/file/d/1_yvmp1Httou9u06-EjxPy5V9e2qFk9ob/view"
+},
+
+"How to Make Own Temporary Mail Bot.":{
+   "description": (
+            "📬 HOW TO CREATE YOUR OWN TEMP MAIL TELEGRAM BOT 📬\n\n"
+        "🚀 Learn how to make a fully functional temporary mail bot for Telegram from scratch!\n\n"
+        "🎬 Video Tutorial Included\n"
+        "1 Download the 'Bots.Business' app from Play Store or Google.\n\n"
+        "✨ Credit: @WinTheBetWithMe , @Paise_wala69"
+  ),
+    "link": "https://drive.google.com/file/d/1nxp-k8BloK2TIQWWPAsHhqKt0ssRNvb7/view"
+},
+
 
     # Add other courses in the same format
 }
