@@ -245,15 +245,6 @@ def system_os_courses_keyboard():
     markup.add("Linux", "PowerShell", "⬅ Back")
     return markup
 
-def special_tools_courses_keyboard():
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    markup.add(
-        "Telegram Number", "Lifetime RDP",
-        "Call Any Indian Number Free", "Make Own SMS Bomber",
-        "Own Temporary Mail Bot", "⬅ Back"
-    )
-    return markup
-
 def premium_courses_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     markup.add(
@@ -520,8 +511,6 @@ def handle_menu(message):
         bot.send_message(chat_id, "Select a course:", reply_markup=system_os_courses_keyboard())
     elif text == "🔹 Special Cyber Tools Courses":
         bot.send_message(chat_id, "Select a course:", reply_markup=special_tools_courses_keyboard())
-    elif text == "🔹 Premium Courses Bundle (31 Paid Courses)":
-        bot.send_message(chat_id, "Select a course:", reply_markup=premium_courses_keyboard())
     elif text == "⬅ Back":
         bot.send_message(chat_id, "Main Menu:", reply_markup=main_menu_keyboard())
     else:
@@ -579,6 +568,85 @@ COURSE_DATA = {
         "💾 Size: 1.48 GB"
     ),
     "link": "https://drive.google.com/file/d/1MbkUaXVsmcnR_7n5H12F0-DcI83NIYSy/view?usp=drive_link"
+},
+  "BlackHat Hacking":{
+    "description": (
+        "🕵️‍♂️ Black Hat Hacking Course 💻\n\n"
+        "🔥 Learn the dark side of cybersecurity – from the basics to advanced hacking techniques!\n\n"
+        "⏳ Length: 05:04:30\n"
+        "💾 Size: 516 MB\n\n"
+        "✨ Support & Share this Bot to help us grow! ❤️"
+    ),
+    "link": "https://drive.google.com/file/d/1tU96CXdNJyCAKFgN8GvyV9oPiizVKIgm/view"
+},
+  "PowerShell":{
+    "description": (
+        "⚡️ PowerShell Course 2025 💻\n\n"
+        "🔥 Master automation and scripting with PowerShell – from fundamentals to advanced techniques!\n\n"
+        "⏳ Length: 03:00:01\n"
+        "💾 Size: 800 MB\n\n"
+        "✨ Support & Share this Bot to help us grow! ❤️"
+    ),
+    "link": "https://drive.google.com/file/d/1VmOkMbujab1ogkPC3k9t24ws2nu1nfJH/view"
+},
+ "Linux":{
+   "description": (
+        "🐧 Linux Mastery Course 2025 💻\n\n"
+        "🔥 Become a Linux pro – from beginner essentials to advanced system administration!\n\n"
+        "⏳ Length: 07:53:22\n"
+        "💾 Size: 1.29 GB\n\n"
+        "✨ Support & Share this Bot to help us grow! ❤️"
+    ),
+    "link": "https://drive.google.com/file/d/1gG3lCo_jqhRTAr7MXkrs6QqO6RPqiZCE/view"
+},
+ "PUBG Hack Development":{
+   "description": (
+        "🌹 PUBG Hack Making Course – Free Download 🌹\n\n"
+        "📜 Course Topics:\n\n"
+        "🔹 Basics About App\n"
+        "🔹 Introduction to Sketchware\n"
+        "🔹 UI Design of Log Cleaner APK\n"
+        "🔹 Designing Progress 2\n"
+        "🔹 Designing Progress 3\n"
+        "🔹 UI Design Final\n"
+        "🔹 Root Permission\n"
+        "🔹 Login\n"
+        "🔹 Log Cleaner\n"
+        "🔹 Log Cleaner Final\n"
+        "🔹 Antiban APK Basic Setup\n"
+        "🔹 UI Improvement\n"
+        "🔹 Firebase Authentication\n"
+        "🔹 One Device Login\n"
+        "🔹 Dialog Box\n"
+        "🔹 Home Page Setup\n"
+        "🔹 Save & Load Key\n"
+        "🔹 Inbuilt Injector\n"
+        "🔹 Floating Icon\n"
+        "🔹 CPP Making\n"
+        "🔹 Features & Values Finding\n"
+        "🔹 Encryption & Online\n"
+        "🔹 Basic Commands & Lua\n"
+        "🔹 Completing the Script\n"
+        "🔹 Memory-Antiban\n"
+        "🔹 Fast Execution Script Making\n\n"
+        "💡 Credit: @WinTheBetWithMe , @Paise_wala69"
+    ),
+    "link": "https://www.mediafire.com/file/y78pzecdr5bmj7y/Pubg_Hack_Making_Course.rar/file"
+},
+ "Binning (by BlackHat)":{
+    "description": (
+        "🎩 Binning by BlackHat Full Course 2025 (A-Z) 🎩\n\n"
+        "📚 This course covers everything from Part 1 to Part 2.\n\n"
+        "🔥 Learn advanced blackhat techniques and tools in a structured manner.\n\n"
+        "⏳ Full Course\n"
+        "💾 Size: Check each part individually\n\n"
+        "✨ Support & Share this resource to help us grow! ❤️"
+    ),
+  "links": [
+        "https://drive.google.com/file/d/1bx3d2xC_bWkNC-4j2coAyebgK7CVEpkT/view?usp=sharing",
+        "https://drive.google.com/file/d/1n06RClzSy6tIGOVvPX_E8LRpeqtkczgV/view?usp=sharing"
+    ]
+
 },
     # Add other courses in the same format
 }
