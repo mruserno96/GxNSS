@@ -225,7 +225,7 @@ def main_menu_keyboard():
 
 def programming_courses_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    markup.add("💻 C++", "☕️ Java ", "JavaScript", "Python", "⬅ Back")
+    markup.add("💻 C++", "☕️ Java", "JavaScript", "Python", "⬅ Back")
     return markup
 
 def hacking_courses_keyboard():
@@ -545,7 +545,7 @@ COURSE_DATA = {
         ),
         "link": "https://drive.google.com/file/d/1Ur5T9dGb_e5EBNJzpTg08ieSHKxwBoeQ/view"
     },
-    "☕️ Java ": {
+    "☕️ Java": {
    "description": (
         "🚀 Master Java Programming Today! 👨‍💻\n\n"
         "📘 Exclusive JAVA Learning PDFs\n"
