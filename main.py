@@ -576,16 +576,15 @@ def fetch_course_text(url: str) -> str:
     try:
         resp = requests.get(url, timeout=8)
         if resp.status_code == 200:
-            return resp.text.strip()
+            text = resp.text.strip()
+            # fix Google Drive links automatically
+            text = text.replace("usp=drivelink", "")
+            return text
         else:
             return "❌ Failed to fetch course material. Try again later."
     except Exception:
         return "❌ Error fetching course content."
 
-            text = resp.text.strip()
-            # fix Google Drive links automatically
-            text = text.replace("usp=drivelink", "")
-            return text
 
 # -------------------------
 # Flask Routes (webhook)
