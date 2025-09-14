@@ -431,23 +431,30 @@ def admin_allpremiumuser(message):
         return
 
     try:
-        resp = supabase.table("users").select("*").eq("status", "premium").execute()
+        # Use ilike for case-insensitive match (handles 'Premium', 'premium', etc.)
+        # NOTE: .ilike is supported by the supabase-py client interface.
+        resp = supabase.table("users").select("*").ilike("status", "premium").execute()
     except Exception as e:
         logger.exception("Supabase query failed in /allpremiumuser: %s", e)
         bot.reply_to(message, "❌ Database error while fetching premium users (see logs).")
         return
 
     # debug log the raw response object for troubleshooting
-    logger.info("/allpremiumuser supabase resp: %r", resp)
+    logger.info("/allpremiumuser supabase raw resp: %r", resp)
 
     # Try to extract rows in multiple possible shapes
     rows = None
     try:
+        # typical supabase-py response has .data
         rows = getattr(resp, "data", None)
     except Exception:
         rows = None
 
-    # Some libs return (resp.data) or resp if already list
+    # Some client versions return a dict
+    if rows is None and isinstance(resp, dict) and "data" in resp:
+        rows = resp["data"]
+
+    # Some older clients return list directly
     if rows is None and isinstance(resp, (list, tuple)):
         rows = resp
 
@@ -462,22 +469,48 @@ def admin_allpremiumuser(message):
         bot.reply_to(message, f"❌ No Premium users found.\n\n{hint}")
         return
 
-    # Build reply
-    msg_lines = ["💎 *Premium Users:*\n"]
+    # Build reply with safe chunking (Telegram max ~4096 chars)
+    header = "💎 *Premium Users:*\n\n"
+    lines = []
     for u in rows:
-        msg_lines.append(
-            f"ID: {u.get('id')}\n"
-            f"TelegramID: {u.get('telegram_id')}\n"
-            f"Username: @{u.get('username') or 'N/A'}\n"
-            f"Name: {u.get('first_name','')} {u.get('last_name','')}\n"
-            f"Status: {u.get('status')}\n"
-            f"Created: {u.get('created_at')}\n\n"
-        )
+        try:
+            lines.append(
+                "ID: {id}\nTelegramID: {telegram_id}\nUsername: @{username}\nName: {first} {last}\nStatus: {status}\nCreated: {created}\n\n".format(
+                    id=u.get("id"),
+                    telegram_id=u.get("telegram_id"),
+                    username=u.get("username") or "N/A",
+                    first=u.get("first_name", ""),
+                    last=u.get("last_name", ""),
+                    status=u.get("status"),
+                    created=u.get("created_at")
+                )
+            )
+        except Exception:
+            # fallback for unexpected row shape
+            lines.append(str(u) + "\n\n")
 
-    bot.reply_to(message, "\n".join(msg_lines).strip(), parse_mode="Markdown")
+    # chunk message into pieces under 3500 chars to be safe
+    chunks = []
+    current = header
+    for l in lines:
+        if len(current) + len(l) > 3500:
+            chunks.append(current)
+            current = l
+        else:
+            current += l
+    if current:
+        chunks.append(current)
 
-
-
+    # send chunks
+    for c in chunks:
+        try:
+            bot.reply_to(message, c, parse_mode="Markdown")
+        except Exception:
+            # fallback: send without markdown
+            try:
+                bot.reply_to(message, c)
+            except Exception:
+                logger.exception("Failed to send /allpremiumuser chunk")
 
 @bot.message_handler(commands=["upgrade"])
 def admin_upgrade(message):
