@@ -525,66 +525,43 @@ def handle_menu(message):
         bot.send_message(chat_id, "Select a course:", reply_markup=premium_courses_keyboard())
     elif text == "⬅ Back":
         bot.send_message(chat_id, "Main Menu:", reply_markup=main_menu_keyboard())
+   else:
+    course = COURSE_DATA.get(text)
+    if course:
+        msg = f"{course['description']}\n\n🔗 Download: {course['link']}"
+        bot.send_message(chat_id, msg)
     else:
-        url = COURSE_URLS.get(text)
-        if url:
-            content = fetch_course_text(url)
-            bot.send_message(chat_id, f"📖 *{text} Course Content:*\n\n{content}", parse_mode="Markdown", disable_web_page_preview=True)
-        else:
-            bot.send_message(chat_id, "⚠️ This course is not available yet.")
+        bot.send_message(chat_id, "⚠️ This course is not available yet.")
+
 # -------------------------
 # External Course Hosting Map
 # -------------------------
-COURSE_URLS = {
-    # Programming
-    "C++": "https://raw.githubusercontent.com/mruserno96/courses-data/refs/heads/main/c.txt",
-    "Java": "https://mruser96.42web.io/courses/java.txt",
-    "JavaScript": "https://mruser96.42web.io/courses/javascript.txt",
-    "Python": "https://mruser96.42web.io/courses/python.txt",
-
-    # Hacking & Cybersecurity
-    "BlackHat Hacking": "https://mruser96.42web.io/courses/blackhat.txt",
-    "Ethical Hacking": "https://mruser96.42web.io/courses/ethical.txt",
-    "Android Hacking": "https://mruser96.42web.io/courses/android_hacking.txt",
-    "WiFi Hacking": "https://mruser96.42web.io/courses/wifi.txt",
-    "Binning (by BlackHat)": "https://mruser96.42web.io/courses/binning.txt",
-    "Antivirus Development": "https://mruser96.42web.io/courses/antivirus.txt",
-    "Phishing App Development": "https://mruser96.42web.io/courses/phishing.txt",
-    "PUBG Hack Development": "https://mruser96.42web.io/courses/pubg.txt",
-    "APK Modding 20+ Course": "https://mruser96.42web.io/courses/apk_modding.txt",
-
-    # System & OS
-    "Linux": "https://mruser96.42web.io/courses/linux.txt",
-    "PowerShell": "https://mruser96.42web.io/courses/powershell.txt",
-
-    # Special Tools
-    "Telegram Number": "https://mruser96.42web.io/courses/tg_number.txt",
-    "Lifetime RDP": "https://mruser96.42web.io/courses/rdp.txt",
-    "Call Any Indian Number Free": "https://mruser96.42web.io/courses/call.txt",
-    "Make Own SMS Bomber": "https://mruser96.42web.io/courses/sms_bomber.txt",
-    "Own Temporary Mail Bot": "https://mruser96.42web.io/courses/temp_mail.txt",
-
-    # Premium Bundle
-    "Cyber Security": "https://mruser96.42web.io/courses/cyber.txt",
-    "Machine Learning": "https://mruser96.42web.io/courses/ml.txt",
-    "Pro Music Production": "https://mruser96.42web.io/courses/music.txt",
-    "Photoshop CC": "https://mruser96.42web.io/courses/photoshop.txt",
+COURSE_DATA = {
+    "C++": {
+        "description": "👩‍💻 C++ Programming for Beginners - From Beginner to Beyond 👩‍💻\n\n"
+                       "🥵 What you'll learn:\n"
+                       "- Learn Modern C++ and core programming concepts\n"
+                       "- Inheritance, polymorphism, and more\n"
+                       "- Quizzes, exercises, and assignments\n\n"
+                       "👥 Size: 2.44 GB\n"
+                       "⏳ Time: 31:07:29",
+        "link": "https://drive.google.com/uc?export=download&id=1Ur5T9dGb_e5EBNJzpTg08ieSHKxwBoeQ"
+    },
+    "Python": {
+        "description": "Python course description here...",
+        "link": "https://example.com/python-course"
+    },
+    # Add other courses in the same format
 }
 
-def fetch_course_text(url: str) -> str:
-    """Fetch course content from a URL."""
-    try:
-        resp = requests.get(url, timeout=10)
-        if resp.status_code == 200:
-            text = resp.text.strip()
-            # Fix Google Drive links automatically
-            text = text.replace("usp=drivelink", "")
-            return text
-        else:
-            return "❌ Failed to fetch course material. Try again later."
-    except Exception as e:
-        return f"❌ Error fetching course content: {e}"
 
+else:
+    course = COURSE_DATA.get(text)
+    if course:
+        msg = f"{course['description']}\n\n🔗 Download: {course['link']}"
+        bot.send_message(chat_id, msg)
+    else:
+        bot.send_message(chat_id, "⚠️ This course is not available yet.")
 
 
 # -------------------------
