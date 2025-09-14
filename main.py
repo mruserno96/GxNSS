@@ -552,10 +552,34 @@ COURSE_DATA = {
         ),
         "link": "https://drive.google.com/file/d/1Ur5T9dGb_e5EBNJzpTg08ieSHKxwBoeQ/view"
     },
-    "Python": {
-        "description": "Python course description here...",
-        "link": "https://example.com/python-course"
-    },
+    "Java": {
+   "description": (
+        "🚀 Master Java Programming Today! 👨‍💻\n\n"
+        "📘 Exclusive JAVA Learning PDFs\n"
+        "Level up your coding skills with these high-quality resources – perfect for beginners to advanced learners.\n\n"
+        "⏳ Length: 12:00:00\n"
+        "💾 Size: 1.38 GB"
+    ),
+    "link": "https://drive.google.com/file/d/1U_yVhz5sJwXtYdgZfo_D_Kb4usSDe7YF/view"
+},
+    "Python":{
+    "description": (
+        "🐍 Python Full Course 2025 🚀\n\n"
+        "🔥 Master Python programming from scratch – perfect for beginners to advanced learners!\n\n"
+        "⏳ Length: 12:00:00\n"
+        "💾 Size: 1.44 GB"
+    ),
+    "link": "https://drive.google.com/file/d/1CXMjGRsANgEYFgXOOQMVz0RazKzbBArz/view"
+},
+  "JavaScript":{
+    "description": (
+        "🚀 The Complete JavaScript Course 2025: From Zero to Expert! 💻\n\n"
+        "🔥 Learn JavaScript like a pro – from the absolute basics to advanced concepts, all in one course!\n\n"
+        "⏳ Length: 12:00:00\n"
+        "💾 Size: 1.48 GB"
+    ),
+    "link": "https://drive.google.com/file/d/1MbkUaXVsmcnR_7n5H12F0-DcI83NIYSy/view?usp=drive_link"
+},
     # Add other courses in the same format
 }
 
