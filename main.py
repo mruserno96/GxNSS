@@ -538,14 +538,19 @@ def handle_menu(message):
 # -------------------------
 COURSE_DATA = {
     "C++": {
-        "description": "👩‍💻 C++ Programming for Beginners - From Beginner to Beyond 👩‍💻\n\n"
-                       "🥵 What you'll learn:\n"
-                       "- Learn Modern C++ and core programming concepts\n"
-                       "- Inheritance, polymorphism, and more\n"
-                       "- Quizzes, exercises, and assignments\n\n"
-                       "👥 Size: 2.44 GB\n"
-                       "⏳ Time: 31:07:29",
-        "link": "https://drive.google.com/uc?export=download&id=1Ur5T9dGb_e5EBNJzpTg08ieSHKxwBoeQ"
+         "description": (
+        "👩‍💻 C++ Programming for Beginners - From Beginner to Beyond 👩‍💻\n\n"
+        "🥵 What you'll learn​:-) \n\n"
+        "🚩 Learn to program with one of the most powerful programming languages that exists today, C++.\n\n"
+        "🚩 Obtain the key concepts of programming that will also apply to other programming languages.\n\n"
+        "🚩 Learn Modern C++ rather than an obsolete version of C++ that most other courses teach.\n\n"
+        "🚩 Learn C++ features from basic to more advanced such as inheritance and polymorphic functions.\n\n"
+        "🚩 Learn C++ using a proven curriculum that covers more material than most C++ university courses.\n\n"
+        "🚩 Learn C++ from an experienced university full professor who has been using and teaching C++ for more than 25 years.\n\n"
+        "🚩 Includes Quizzes, Live Coding Exercises, Challenge Coding Exercises and Assignments.\n\n"
+        "👥 Size:-) 2.44 GB\n"
+        "⏳ Time:-) 31:07:29",
+    "link": "https://drive.google.com/file/d/1Ur5T9dGb_e5EBNJzpTg08ieSHKxwBoeQ/view"
     },
     "Python": {
         "description": "Python course description here...",
