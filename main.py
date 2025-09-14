@@ -62,9 +62,7 @@ COURSES_MESSAGE = (
     "Linux\nPowerShell\n\n"
     "🔹 *Special Cyber Tools Courses*\n"
     "How to Make Telegram Number\nHow to Make Lifetime RDP\nHow to Call Any Indian Number Free\n"
-    "How to Make Own SMS Bomber\nHow to Make Own Temporary Mail Bot\n\n"
-    "🔹 *Premium Courses Bundle (31 Paid Courses)*\n"
-    "Cyber Security\nPython\nMachine Learning\nPro Music Production\nPhotoshop CC\n(and many more…)"
+    "How to Make Own SMS Bomber\nHow to Make Own Temporary Mail Bot.)"
 )
 PROMO_MESSAGE = (
     "🚀 *Huge Course Bundle – Just ₹79!* (Originally ₹199)\n\n"
@@ -222,7 +220,6 @@ def main_menu_keyboard():
         "🔹 Hacking & Cybersecurity Courses",
         "🔹 System & OS Courses",
         "🔹 Special Cyber Tools Courses",
-        "🔹 Premium Courses Bundle (31 Paid Courses)"
     )
     return markup
 
@@ -643,6 +640,15 @@ COURSE_DATA = {
   ),
     "link": "https://drive.google.com/drive/folders/1fQqJnMQP2GwlpaV7seqAyL19vHbZno5M"
 },
+"Android Hacking":{
+   "description": (
+          "🚀 Android Hacking Course 🔐📱\n"
+     "💡 Master Android security, exploit vulnerabilities, and level up your ethical hacking skills! ⚡️\n\n"
+             "💡 Credit: @WinTheBetWithMe , @Paise_wala69"
+  ),
+    "link": "https://drive.google.com/drive/folders/11dqpULb1h14jyoZeSwsAo_bd3XN4t602"
+},
+
     # Add other courses in the same format
 }
 
