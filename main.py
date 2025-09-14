@@ -572,18 +572,19 @@ COURSE_URLS = {
 }
 
 def fetch_course_text(url: str) -> str:
-    """Fetch .txt content from hosting URL"""
+    """Fetch course content from a URL."""
     try:
-        resp = requests.get(url, timeout=8)
+        resp = requests.get(url, timeout=10)
         if resp.status_code == 200:
             text = resp.text.strip()
-            # fix Google Drive links automatically
+            # Fix Google Drive links automatically
             text = text.replace("usp=drivelink", "")
             return text
         else:
             return "❌ Failed to fetch course material. Try again later."
-    except Exception:
-        return "❌ Error fetching course content."
+    except Exception as e:
+        return f"❌ Error fetching course content: {e}"
+
 
 
 # -------------------------
