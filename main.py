@@ -499,14 +499,13 @@ def handle_menu(message):
     text = message.text
     chat_id = message.chat.id
 
-    # Use cache to speed up repeated checks
     user_row = get_user_cached(message.from_user.id)
     if not user_row:
         try:
             uresp = supabase.table("users").select("*").eq("telegram_id", message.from_user.id).single().execute()
             user_row = uresp.data
             if user_row:
-                USER_CACHE[message.from_user.id] = (user_row.get("status"), time.time() + USER_CACHE_TTL, user_row)
+                USER_CACHE[message.from_user.id] = (user_row.get("status"), time.time()+USER_CACHE_TTL, user_row)
         except Exception:
             user_row = None
 
@@ -533,25 +532,25 @@ def handle_menu(message):
         else:
             bot.send_message(chat_id, "⚠️ This course is not available yet.")
 
-
 # -------------------------
 # External Course Hosting Map
 # -------------------------
 COURSE_DATA = {
     "C++": {
-         "description": (
-        "👩‍💻 C++ Programming for Beginners - From Beginner to Beyond 👩‍💻\n\n"
-        "🥵 What you'll learn​:-) \n\n"
-        "🚩 Learn to program with one of the most powerful programming languages that exists today, C++.\n\n"
-        "🚩 Obtain the key concepts of programming that will also apply to other programming languages.\n\n"
-        "🚩 Learn Modern C++ rather than an obsolete version of C++ that most other courses teach.\n\n"
-        "🚩 Learn C++ features from basic to more advanced such as inheritance and polymorphic functions.\n\n"
-        "🚩 Learn C++ using a proven curriculum that covers more material than most C++ university courses.\n\n"
-        "🚩 Learn C++ from an experienced university full professor who has been using and teaching C++ for more than 25 years.\n\n"
-        "🚩 Includes Quizzes, Live Coding Exercises, Challenge Coding Exercises and Assignments.\n\n"
-        "👥 Size:-) 2.44 GB\n"
-        "⏳ Time:-) 31:07:29",
-    "link": "https://drive.google.com/file/d/1Ur5T9dGb_e5EBNJzpTg08ieSHKxwBoeQ/view"
+        "description": (
+            "👩‍💻 C++ Programming for Beginners - From Beginner to Beyond 👩‍💻\n\n"
+            "🥵 What you'll learn​:-) \n\n"
+            "🚩 Learn to program with one of the most powerful programming languages that exists today, C++.\n\n"
+            "🚩 Obtain the key concepts of programming that will also apply to other programming languages.\n\n"
+            "🚩 Learn Modern C++ rather than an obsolete version of C++ that most other courses teach.\n\n"
+            "🚩 Learn C++ features from basic to more advanced such as inheritance and polymorphic functions.\n\n"
+            "🚩 Learn C++ using a proven curriculum that covers more material than most C++ university courses.\n\n"
+            "🚩 Learn C++ from an experienced university full professor who has been using and teaching C++ for more than 25 years.\n\n"
+            "🚩 Includes Quizzes, Live Coding Exercises, Challenge Coding Exercises and Assignments.\n\n"
+            "👥 Size:-) 2.44 GB\n"
+            "⏳ Time:-) 31:07:29"
+        ),
+        "link": "https://drive.google.com/file/d/1Ur5T9dGb_e5EBNJzpTg08ieSHKxwBoeQ/view"
     },
     "Python": {
         "description": "Python course description here...",
@@ -559,16 +558,6 @@ COURSE_DATA = {
     },
     # Add other courses in the same format
 }
-
-
-else:
-    course = COURSE_DATA.get(text)
-    if course:
-        msg = f"{course['description']}\n\n🔗 Download: {course['link']}"
-        bot.send_message(chat_id, msg)
-    else:
-        bot.send_message(chat_id, "⚠️ This course is not available yet.")
-
 
 # -------------------------
 # Flask Routes (webhook)
