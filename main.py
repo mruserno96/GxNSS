@@ -633,21 +633,6 @@ COURSE_DATA = {
     ),
     "link": "https://www.mediafire.com/file/y78pzecdr5bmj7y/Pubg_Hack_Making_Course.rar/file"
 },
- "Binning (by BlackHat)":{
-    "description": (
-        "🎩 Binning by BlackHat Full Course 2025 (A-Z) 🎩\n\n"
-        "📚 This course covers everything from Part 1 to Part 2.\n\n"
-        "🔥 Learn advanced blackhat techniques and tools in a structured manner.\n\n"
-        "⏳ Full Course\n"
-        "💾 Size: Check each part individually\n\n"
-        "✨ Support & Share this resource to help us grow! ❤️"
-    ),
-  "links": [
-        "https://drive.google.com/file/d/1bx3d2xC_bWkNC-4j2coAyebgK7CVEpkT/view?usp=sharing",
-        "https://drive.google.com/file/d/1n06RClzSy6tIGOVvPX_E8LRpeqtkczgV/view?usp=sharing"
-    ]
-
-},
     # Add other courses in the same format
 }
 
