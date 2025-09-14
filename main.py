@@ -225,32 +225,32 @@ def main_menu_keyboard():
 
 def programming_courses_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    markup.add("💻 C++", "☕️ Java", "JavaScript", "Python", "⬅ Back")
+    markup.add("💻 C++", "☕️ Java", "🌐 JavaScript", "🐍 Python", "⬅ Back")
     return markup
 
 def hacking_courses_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     markup.add(
-        "BlackHat Hacking", "Ethical Hacking", "Android Hacking", "WiFi Hacking",
-        "Binning (by BlackHat)", "Phishing App Development",
-        "PUBG Hack Development", "APK Modding 20+ Course", "⬅ Back"
+        "🎩 BlackHat Hacking", "🛡 Ethical Hacking", "🤖 Android Hacking", "📶 WiFi Hacking",
+        "🗑 Binning (by BlackHat)", "🎭 Phishing App Development",
+        "🎮 PUBG Hack Development", "📱 APK Modding (20+ Courses)", "⬅ Back"
     )
     return markup
 
 def system_os_courses_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    markup.add("Linux", "PowerShell", "⬅ Back")
+    markup.add("🐧 Linux", "⚡️ PowerShell", "⬅ Back")
     return markup
 
 
 def special_tools_courses_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     markup.add(
-        "How to Make Telegram Number",
-        "How to Make Lifetime RDP",
-        "How to Call Any Indian Number Free",
-        "How to Make Own SMS Bomber",
-        "How to Make Own Temporary Mail Bot",
+        "📞 Make a Telegram Number",
+        "💻 Lifetime RDP",
+        "☎️  Call Any Indian Number Free",
+        "💣 Own SMS Bomber",
+        "✉️ Own Temporary Mail Bot",
         "⬅ Back"
     )
     return markup
@@ -527,7 +527,7 @@ def handle_menu(message):
 # External Course Hosting Map
 # -------------------------
 COURSE_DATA = {
-    "C++": {
+    "💻 C++": {
         "description": (
             "👩‍💻 C++ Programming for Beginners - From Beginner to Beyond 👩‍💻\n\n"
             "🥵 What you'll learn​:-) \n\n"
@@ -557,7 +557,7 @@ COURSE_DATA = {
     ),
     "link": "https://drive.google.com/file/d/1U_yVhz5sJwXtYdgZfo_D_Kb4usSDe7YF/view"
 },
-    "Python":{
+    "🐍 Python":{
     "description": (
         "🐍 Python Full Course 2025 🚀\n\n"
         "🔥 Master Python programming from scratch – perfect for beginners to advanced learners!\n\n"
@@ -568,7 +568,7 @@ COURSE_DATA = {
     ),
     "link": "https://drive.google.com/file/d/1CXMjGRsANgEYFgXOOQMVz0RazKzbBArz/view"
 },
-  "JavaScript":{
+  "🌐 JavaScript":{
     "description": (
         "🚀 The Complete JavaScript Course 2025: From Zero to Expert! 💻\n\n"
         "🔥 Learn JavaScript like a pro – from the absolute basics to advanced concepts, all in one course!\n\n"
@@ -579,7 +579,7 @@ COURSE_DATA = {
     ),
     "link": "https://drive.google.com/file/d/1MbkUaXVsmcnR_7n5H12F0-DcI83NIYSy/view?usp=drive_link"
 },
-  "BlackHat Hacking":{
+  "🎩 BlackHat Hacking":{
     "description": (
         "🕵️‍♂️ Black Hat Hacking Course 💻\n\n"
         "🔥 Learn the dark side of cybersecurity – from the basics to advanced hacking techniques!\n\n"
@@ -591,7 +591,7 @@ COURSE_DATA = {
     ),
     "link": "https://drive.google.com/file/d/1tU96CXdNJyCAKFgN8GvyV9oPiizVKIgm/view"
 },
-  "PowerShell":{
+  "⚡️ PowerShell":{
     "description": (
         "⚡️ PowerShell Course 2025 💻\n\n"
         "🔥 Master automation and scripting with PowerShell – from fundamentals to advanced techniques!\n\n"
@@ -603,7 +603,7 @@ COURSE_DATA = {
     ),
     "link": "https://drive.google.com/file/d/1VmOkMbujab1ogkPC3k9t24ws2nu1nfJH/view"
 },
- "Linux":{
+ "🐧 Linux":{
    "description": (
         "🐧 Linux Mastery Course 2025 💻\n\n"
         "🔥 Become a Linux pro – from beginner essentials to advanced system administration!\n\n"
@@ -614,7 +614,7 @@ COURSE_DATA = {
     ),
     "link": "https://drive.google.com/file/d/1gG3lCo_jqhRTAr7MXkrs6QqO6RPqiZCE/view"
 },
- "PUBG Hack Development":{
+ "🎮 PUBG Hack Development":{
    "description": (
         "🌹 PUBG Hack Making Course – Free Download 🌹\n\n"
         "📜 Course Topics:\n\n"
@@ -648,7 +648,7 @@ COURSE_DATA = {
     ),
     "link": "https://www.mediafire.com/file/y78pzecdr5bmj7y/Pubg_Hack_Making_Course.rar/file"
 },
-"Binning (by BlackHat)":{
+"🗑 Binning (by BlackHat)":{
    "description": (
           "🎩 Binning by BlackHat Full Course 2025 (A-Z) 🎩\n"
         "Learn advanced blackhat techniques and tools in a structured manner.\n"
@@ -658,7 +658,7 @@ COURSE_DATA = {
   ),
     "link": "https://drive.google.com/drive/folders/1fQqJnMQP2GwlpaV7seqAyL19vHbZno5M"
 },
-"Android Hacking":{
+"🤖 Android Hacking":{
    "description": (
           "🚀 Android Hacking Course 🔐📱\n"
      "💡 Master Android security, exploit vulnerabilities, and level up your ethical hacking skills! ⚡️\n\n"
@@ -667,7 +667,7 @@ COURSE_DATA = {
     "link": "https://drive.google.com/drive/folders/11dqpULb1h14jyoZeSwsAo_bd3XN4t602"
 },
 
-"WiFi Hacking":{
+"📶 WiFi Hacking":{
    "description": (
               "💢 WiFi Hacking Course in Hindi 💢\n\n"
         "📍 What you'll learn :-\n\n"
@@ -682,7 +682,7 @@ COURSE_DATA = {
     "link": "https://drive.google.com/folderview?id=1tgkKt4lSpXD3GnMQRgUb4bbtlmpP9XOE"
 },
 
-"Ethical Hacking":{
+"🛡 Ethical Hacking":{
    "description": (
                 "🔰 ETHICAL HACKING COURSE 🔰\n"
                 "🌀 Language ~ Hindi\n"
@@ -693,7 +693,7 @@ COURSE_DATA = {
     "link": "http://www.mediafire.com/file/qiax38wizsnj8zm/HACK2ED+-+Tech+Vansh.rar/file"
 },
 
-"Phishing App Development":{
+"🎭 Phishing App Development":{
    "description": (
        
        "This is Zpisher Famous Phishing Tool\n"
@@ -712,7 +712,7 @@ COURSE_DATA = {
     "link": "https://github.com/htr-tech/zphisher"
 },
 
-"APK Modding 20+ Course":{
+"📱 APK Modding (20+ Courses)":{
    "description": (
                   "📱 APK Modding & Game Guardian Masterclass\n\n"
         "💻 Learn to Create, Modify, and Secure Android Apps & Games!\n\n"
@@ -756,7 +756,7 @@ COURSE_DATA = {
     "link": "https://pastebin.com/raw/RmnWccvp"
 },
 
-"How to Make Telegram Number":{
+"📞 Make a Telegram Number":{
    "description": (
                 "📲 How To Make Unlimited Numbers for Telegram or WhatsApp\n\n"
         "💡 Follow the method carefully to generate multiple working numbers.\n\n"
@@ -767,7 +767,7 @@ COURSE_DATA = {
     "link": "https://drive.google.com/file/d/1VoQYPQU2weBfhZJsMe5sHInO9HJTwSwK/view"
 },
 
-"How to Make Lifetime RDP":{
+"💻 Lifetime RDP":{
    "description": (
        "☠️ How To Make Lifetime RDP For Free\n\n1."
    " First Go On Chrome And Open This Website - rdphostings.com\n"
@@ -785,7 +785,7 @@ COURSE_DATA = {
     "link": "rdphostings.com"
 },
 
-"How to Call Any Indian Number Free":{
+"☎️  Call Any Indian Number Free":{
    "description": (
         "📞 UNLIMITED CALLS ANY INDIAN NUMBERS FOR FREE\n\n"
         "New App Trick / Method\n\n"
@@ -797,7 +797,7 @@ COURSE_DATA = {
     "link": "https://drive.google.com/file/d/1_1qgSlxSFOshlkXaoFtcWq2G1_JTPtxX/view"
 },
 
-"How to Make Own SMS Bomber":{
+"💣 Own SMS Bomber":{
    "description": (
        "💥 CREATE YOUR OWN SMS BOMBER 💥\n\n"
         "🚀 Learn step-by-step how to make a powerful SMS Bomber tool from scratch.\n\n"
@@ -814,7 +814,7 @@ COURSE_DATA = {
     "link": "https://drive.google.com/file/d/1_yvmp1Httou9u06-EjxPy5V9e2qFk9ob/view"
 },
 
-"How to Make Own Temporary Mail Bot":{
+"✉️ Own Temporary Mail Bot":{
    "description": (
             "📬 HOW TO CREATE YOUR OWN TEMP MAIL TELEGRAM BOT 📬\n\n"
         "🚀 Learn how to make a fully functional temporary mail bot for Telegram from scratch!\n\n"
