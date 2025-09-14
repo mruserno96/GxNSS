@@ -537,7 +537,7 @@ def handle_menu(message):
 # -------------------------
 COURSE_URLS = {
     # Programming
-    "C++": "https://mruser96.42web.io/gxnss/c.txt",
+    "C++": "https://raw.githubusercontent.com/mruserno96/courses-data/refs/heads/main/c.txt",
     "Java": "https://mruser96.42web.io/courses/java.txt",
     "JavaScript": "https://mruser96.42web.io/courses/javascript.txt",
     "Python": "https://mruser96.42web.io/courses/python.txt",
