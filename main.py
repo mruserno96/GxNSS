@@ -72,11 +72,41 @@ PROMO_MESSAGE = (
 )
 PAYMENT_INSTRUCTIONS = (
     f"🔔 *Payment Instructions*\n\n"
-    f"UPI: {UPI_ID}\n\n"
+    f"UPI: `{UPI_ID}`\n\n"
     "1. Scan the QR or pay using the UPI above.\n"
     "2. Click *I Paid (Upload Screenshot)* below to upload proof.\n\n"
     "We’ll verify and grant access."
 )
+
+# -------------------------
+# Small in-memory cache to reduce DB calls (helps on free hosts)
+# -------------------------
+USER_CACHE = {}  # telegram_id -> (status, expire_ts)
+USER_CACHE_TTL = 30  # seconds
+
+def get_user_cached(telegram_id):
+    """Return user row from cache or DB. Cache only status and id for speed."""
+    now = time.time()
+    cached = USER_CACHE.get(telegram_id)
+    if cached:
+        status, expire_ts, user_row = cached
+        if expire_ts > now:
+            return user_row
+        else:
+            USER_CACHE.pop(telegram_id, None)
+    # fallback to DB
+    try:
+        resp = supabase.table("users").select("*").eq("telegram_id", int(telegram_id)).single().execute()
+        user_row = resp.data
+    except Exception:
+        user_row = None
+    # cache minimal info for short time
+    expire_ts = now + USER_CACHE_TTL
+    USER_CACHE[telegram_id] = (user_row.get("status") if user_row else None, expire_ts, user_row)
+    return user_row
+
+def invalidate_user_cache(telegram_id):
+    USER_CACHE.pop(telegram_id, None)
 
 # -------------------------
 # Helpers
@@ -102,8 +132,11 @@ def find_or_create_user(telegram_id, username, first_name=None, last_name=None):
     except Exception:
         pass
     resp = supabase.table("users").select("*").eq("telegram_id", telegram_id).limit(1).execute()
-    if resp.data:
-        return resp.data[0]
+    if resp and resp.data:
+        user = resp.data[0]
+        # cache
+        USER_CACHE[telegram_id] = (user.get("status"), time.time() + USER_CACHE_TTL, user)
+        return user
     new_user = {
         "telegram_id": telegram_id,
         "username": username,
@@ -115,12 +148,16 @@ def find_or_create_user(telegram_id, username, first_name=None, last_name=None):
         "updated_at": datetime.utcnow().isoformat(),
     }
     ins = supabase.table("users").insert(new_user).execute()
-    return ins.data[0] if ins.data else None
+    user = ins.data[0] if ins.data else None
+    if user:
+        USER_CACHE[telegram_id] = (user.get("status"), time.time() + USER_CACHE_TTL, user)
+    return user
 
 def upload_to_supabase(bucket, object_path, file_bytes, content_type="image/jpeg"):
     object_path = object_path.lstrip("/")
     storage = supabase.storage.from_(bucket)
     try:
+        # remove existing if any
         storage.remove([object_path])
     except Exception:
         pass
@@ -150,13 +187,16 @@ def save_message(user_id, chat_id, message_id):
         pass
 
 def delete_old_messages(user_row):
-    rows = supabase.table("messages").select("*").eq("user_id", user_row["id"]).execute().data
-    for r in rows:
-        try:
-            bot.delete_message(r["chat_id"], r["message_id"])
-        except Exception:
-            pass
-    supabase.table("messages").delete().eq("user_id", user_row["id"]).execute()
+    try:
+        rows = supabase.table("messages").select("*").eq("user_id", user_row["id"]).execute().data or []
+        for r in rows:
+            try:
+                bot.delete_message(r["chat_id"], r["message_id"])
+            except Exception:
+                pass
+        supabase.table("messages").delete().eq("user_id", user_row["id"]).execute()
+    except Exception:
+        pass
 
 def notify_user_upgrade(user_row):
     try:
@@ -167,6 +207,8 @@ def notify_user_upgrade(user_row):
             parse_mode="Markdown"
         )
         save_message(user_row["id"], user_row["telegram_id"], sent.message_id)
+        # Invalidate cache so /start shows premium menu next time
+        invalidate_user_cache(user_row["telegram_id"])
     except Exception:
         pass
 
@@ -234,6 +276,7 @@ def send_welcome(message):
     )
 
     if user and user.get("status") == "premium":
+        # Directly show premium menu keyboard
         bot.send_message(
             cid,
             "🎉 Welcome back Premium User!",
@@ -241,13 +284,211 @@ def send_welcome(message):
         )
         return
 
-    # Normal users
+    # Normal users: unchanged promo/payment flow
     sent = bot.send_message(cid, COURSES_MESSAGE, parse_mode="Markdown")
-    save_message(user["id"], cid, sent.message_id)
+    try:
+        save_message(user["id"], cid, sent.message_id)
+    except Exception:
+        pass
+
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("Buy Course For ₹79", callback_data="buy"))
     sent2 = bot.send_message(cid, PROMO_MESSAGE, parse_mode="Markdown", reply_markup=markup)
-    save_message(user["id"], cid, sent2.message_id)
+    try:
+        save_message(user["id"], cid, sent2.message_id)
+    except Exception:
+        pass
+
+# -------------------------
+# Inline callback handlers (Buy + I Paid)
+# -------------------------
+@bot.callback_query_handler(func=lambda c: c.data == "buy")
+def handle_buy(call):
+    try:
+        bot.answer_callback_query(call.id, "Preparing payment…")
+    except Exception:
+        pass
+
+    cid = call.message.chat.id
+    instr_markup = types.InlineKeyboardMarkup()
+    instr_markup.add(types.InlineKeyboardButton("I Paid (Upload Screenshot)", callback_data="i_paid"))
+
+    caption = f"{PAYMENT_INSTRUCTIONS}\n\n👇 After payment, click the button below."
+
+    try:
+        sent = bot.send_photo(
+            cid,
+            QR_IMAGE_URL + datetime.utcnow().strftime("%H%M%S"),
+            caption=caption,
+            parse_mode="Markdown",
+            reply_markup=instr_markup
+        )
+        # Save message for deletion later if user exists
+        user = get_user_cached(call.from_user.id) or supabase.table("users").select("*").eq("telegram_id", call.from_user.id).single().execute().data
+        if user:
+            try:
+                save_message(user["id"], cid, sent.message_id)
+            except Exception:
+                pass
+    except Exception as e:
+        try:
+            bot.send_message(cid, "❌ Failed to send QR image. Please try again.")
+        except Exception:
+            pass
+        logger.exception("handle_buy error: %s", e)
+
+@bot.callback_query_handler(func=lambda c: c.data == "i_paid")
+def handle_paid(call):
+    try:
+        bot.answer_callback_query(call.id, "Upload screenshot now")
+    except Exception:
+        pass
+
+    cid = call.message.chat.id
+    try:
+        supabase.table("users").update({"pending_upload": True}).eq("telegram_id", call.from_user.id).execute()
+    except Exception:
+        pass
+
+    sent = bot.send_message(cid, "✅ Please upload your payment screenshot here.\n\nMake sure the screenshot clearly shows the transaction details.")
+    try:
+        user = get_user_cached(call.from_user.id) or supabase.table("users").select("*").eq("telegram_id", call.from_user.id).single().execute().data
+        if user:
+            save_message(user["id"], cid, sent.message_id)
+    except Exception:
+        pass
+
+# -------------------------
+# Upload handler (photo/document)
+# -------------------------
+@bot.message_handler(content_types=["photo", "document"])
+def handle_upload(message):
+    user = message.from_user
+    try:
+        t_id = int(user.id)
+    except Exception:
+        t_id = user.id
+
+    try:
+        uresp = supabase.table("users").select("*").eq("telegram_id", t_id).single().execute()
+        urow = uresp.data
+    except Exception:
+        urow = None
+
+    if not urow or not urow.get("pending_upload"):
+        bot.reply_to(message, "⚠️ Please click *I Paid (Upload Screenshot)* before sending a screenshot.", parse_mode="Markdown")
+        return
+
+    try:
+        fid = message.photo[-1].file_id if message.content_type == "photo" else message.document.file_id
+        file_info = bot.get_file(fid)
+        file_bytes = bot.download_file(file_info.file_path)
+    except Exception:
+        bot.reply_to(message, "❌ Failed to download your screenshot. Please try again.")
+        return
+
+    ts = datetime.utcnow().strftime("%Y%m%dT%H%M%S")
+    ext = os.path.splitext(file_info.file_path)[1] or ".jpg"
+    object_path = f"{UPLOAD_FOLDER_PREFIX}/{user.id}_{ts}{ext}"
+
+    try:
+        _, url = upload_to_supabase(BUCKET_NAME, object_path, file_bytes)
+    except Exception as e:
+        bot.reply_to(message, f"❌ Upload failed. Error: {e}")
+        return
+
+    try:
+        create_payment(urow, object_path, url, user.username or "")
+    except Exception:
+        bot.reply_to(message, "❌ Failed to record your payment. Please try again.")
+        return
+
+    try:
+        supabase.table("users").update({"pending_upload": False}).eq("telegram_id", user.id).execute()
+    except Exception:
+        pass
+
+    bot.send_message(
+        message.chat.id,
+        "❤️‍🔥 Payment screenshot received!\n\n"
+        "Admin will verify your payment shortly. If approved, you'll be upgraded to Premium. 🚀",
+        parse_mode="Markdown"
+    )
+    notify_admins(f"🆕 Payment uploaded by @{user.username or user.id}\nUserID: {urow.get('id')}\nURL: {url}")
+
+# -------------------------
+# /admin and admin helpers
+# -------------------------
+@bot.message_handler(commands=["admin"])
+def admin_help(message):
+    if not is_admin(message.from_user.id):
+        return
+    bot.reply_to(message, (
+        "👮 *Admin Commands*\n\n"
+        "/upgrade <userid|username> – Upgrade manually\n"
+        "/allpremiumuser – View all Premium users"
+    ), parse_mode="Markdown")
+
+@bot.message_handler(commands=["allpremiumuser"])
+def admin_allpremiumuser(message):
+    if not is_admin(message.from_user.id):
+        return
+    rows = supabase.table("users").select("*").eq("status", "premium").execute().data or []
+    if not rows:
+        bot.reply_to(message, "❌ No Premium users found.")
+        return
+    msg = "💎 *Premium Users:*\n\n"
+    for u in rows:
+        msg += (
+            f"ID: {u.get('id')}\n"
+            f"TelegramID: {u.get('telegram_id')}\n"
+            f"Username: @{u.get('username') or 'N/A'}\n"
+            f"Name: {u.get('first_name','')} {u.get('last_name','')}\n"
+            f"Status: {u.get('status')}\n"
+            f"Created: {u.get('created_at')}\n\n"
+        )
+    bot.reply_to(message, msg.strip(), parse_mode="Markdown")
+
+@bot.message_handler(commands=["upgrade"])
+def admin_upgrade(message):
+    if not is_admin(message.from_user.id):
+        return
+
+    args = message.text.split()
+    if len(args) < 2:
+        bot.reply_to(message, "Usage: /upgrade <user_id|username>")
+        return
+    target = args[1]
+
+    try:
+        if target.isdigit():
+            resp = supabase.table("users").select("*").eq("id", int(target)).limit(1).execute()
+        else:
+            username_lookup = target.lstrip("@")
+            resp = supabase.table("users").select("*").eq("username", username_lookup).limit(1).execute()
+    except Exception:
+        bot.reply_to(message, "❌ Database error while searching for user.")
+        return
+
+    user_row = (resp.data or [None])[0]
+    if not user_row:
+        bot.reply_to(message, f"❌ User {target} not found.")
+        return
+
+    if user_row.get("status") == "premium":
+        bot.reply_to(message, f"✅ User {target} is already Premium.")
+        return
+
+    try:
+        supabase.table("users").update({"status": "premium", "updated_at": datetime.utcnow().isoformat()}).eq("id", user_row["id"]).execute()
+        supabase.table("payments").update({"verified": True}).eq("user_id", user_row["id"]).execute()
+        invalidate_user_cache(user_row["telegram_id"])
+    except Exception:
+        bot.reply_to(message, f"❌ Failed to upgrade {target}.")
+        return
+
+    notify_user_upgrade(user_row)
+    bot.reply_to(message, f"✅ User {target} upgraded to Premium!")
 
 # -------------------------
 # Premium Menu Handler
@@ -257,10 +498,20 @@ def handle_menu(message):
     text = message.text
     chat_id = message.chat.id
 
-    # Only premium users can access the menu
-    uresp = supabase.table("users").select("*").eq("telegram_id", message.from_user.id).single().execute()
-    user_row = uresp.data
+    # Use cache to speed up repeated checks
+    user_row = get_user_cached(message.from_user.id)
+    if not user_row:
+        # fallback to DB if cache miss
+        try:
+            uresp = supabase.table("users").select("*").eq("telegram_id", message.from_user.id).single().execute()
+            user_row = uresp.data
+            if user_row:
+                USER_CACHE[message.from_user.id] = (user_row.get("status"), time.time()+USER_CACHE_TTL, user_row)
+        except Exception:
+            user_row = None
+
     if not user_row or user_row.get("status") != "premium":
+        # ignore non-premium; keep normal command handlers active elsewhere
         return
 
     if text == "🔹 Programming Courses":
@@ -290,17 +541,7 @@ def handle_menu(message):
             bot.send_message(chat_id, f"Here is your course: {link}")
 
 # -------------------------
-# Payment Handlers
-# -------------------------
-# Keep all your existing handle_buy, handle_paid, handle_upload functions as-is
-
-# -------------------------
-# Admin Handlers
-# -------------------------
-# Keep all your admin /upgrade and /allpremiumuser functions as-is
-
-# -------------------------
-# Flask Routes
+# Flask Routes (webhook)
 # -------------------------
 @app.route("/", methods=["GET"])
 def index():
@@ -310,15 +551,24 @@ def index():
 def set_webhook():
     bot.remove_webhook()
     full_url = f"{WEBHOOK_URL}/{BOT_TOKEN}"
-    bot.set_webhook(url=full_url)
+    # drop_pending_updates True helps when switching from polling to webhook or after downtime
+    bot.set_webhook(url=full_url, drop_pending_updates=True)
     return f"Webhook set to {full_url}", 200
 
 @app.route(f"/{BOT_TOKEN}", methods=["POST"])
 def telegram_webhook():
-    if request.headers.get("content-type") != "application/json":
+    # Accept content types that start with application/json (handles charset)
+    content_type = request.headers.get("content-type", "")
+    if not content_type.startswith("application/json"):
         abort(403)
-    update = telebot.types.Update.de_json(request.get_data().decode("utf-8"))
-    bot.process_new_updates([update])
+    try:
+        payload = request.get_data().decode("utf-8")
+        update = telebot.types.Update.de_json(payload)
+        bot.process_new_updates([update])
+    except Exception as e:
+        # log but return 200 so Telegram doesn't retry excessively
+        logger.exception("Failed to process update: %s", e)
+        return "OK", 200
     return "OK", 200
 
 # -------------------------
