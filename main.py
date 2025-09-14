@@ -424,15 +424,48 @@ def admin_help(message):
 
 @bot.message_handler(commands=["allpremiumuser"])
 def admin_allpremiumuser(message):
+    # ensure the caller is admin
     if not is_admin(message.from_user.id):
+        bot.reply_to(message, "❌ You are not an admin.")
+        logger.warning("Unauthorized /allpremiumuser call from %s", message.from_user.id)
         return
-    rows = supabase.table("users").select("*").eq("status", "premium").execute().data or []
+
+    try:
+        resp = supabase.table("users").select("*").eq("status", "premium").execute()
+    except Exception as e:
+        logger.exception("Supabase query failed in /allpremiumuser: %s", e)
+        bot.reply_to(message, "❌ Database error while fetching premium users (see logs).")
+        return
+
+    # debug log the raw response object for troubleshooting
+    logger.info("/allpremiumuser supabase resp: %r", resp)
+
+    # Try to extract rows in multiple possible shapes
+    rows = None
+    try:
+        rows = getattr(resp, "data", None)
+    except Exception:
+        rows = None
+
+    # Some libs return (resp.data) or resp if already list
+    if rows is None and isinstance(resp, (list, tuple)):
+        rows = resp
+
     if not rows:
-        bot.reply_to(message, "❌ No Premium users found.")
+        # helpful hint for operators
+        hint = (
+            "No premium users returned.\n"
+            "- If you expect rows, check Supabase table data and 'status' column values.\n"
+            "- If Row Level Security is enabled, ensure your server key has permission.\n"
+            "- Check server logs for the Supabase response above."
+        )
+        bot.reply_to(message, f"❌ No Premium users found.\n\n{hint}")
         return
-    msg = "💎 *Premium Users:*\n\n"
+
+    # Build reply
+    msg_lines = ["💎 *Premium Users:*\n"]
     for u in rows:
-        msg += (
+        msg_lines.append(
             f"ID: {u.get('id')}\n"
             f"TelegramID: {u.get('telegram_id')}\n"
             f"Username: @{u.get('username') or 'N/A'}\n"
@@ -440,7 +473,9 @@ def admin_allpremiumuser(message):
             f"Status: {u.get('status')}\n"
             f"Created: {u.get('created_at')}\n\n"
         )
-    bot.reply_to(message, msg.strip(), parse_mode="Markdown")
+
+    bot.reply_to(message, "\n".join(msg_lines).strip(), parse_mode="Markdown")
+
 
 @bot.message_handler(commands=["upgrade"])
 def admin_upgrade(message):
