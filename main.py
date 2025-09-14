@@ -491,6 +491,7 @@ def admin_upgrade(message):
     bot.reply_to(message, f"✅ User {target} upgraded to Premium!")
 
 # -------------------------
+# -------------------------
 # Premium Menu Handler
 # -------------------------
 @bot.message_handler(func=lambda message: True)
@@ -501,7 +502,6 @@ def handle_menu(message):
     # Use cache to speed up repeated checks
     user_row = get_user_cached(message.from_user.id)
     if not user_row:
-        # fallback to DB if cache miss
         try:
             uresp = supabase.table("users").select("*").eq("telegram_id", message.from_user.id).single().execute()
             user_row = uresp.data
@@ -511,7 +511,6 @@ def handle_menu(message):
             user_row = None
 
     if not user_row or user_row.get("status") != "premium":
-        # ignore non-premium; keep normal command handlers active elsewhere
         return
 
     if text == "🔹 Programming Courses":
@@ -527,18 +526,61 @@ def handle_menu(message):
     elif text == "⬅ Back":
         bot.send_message(chat_id, "Main Menu:", reply_markup=main_menu_keyboard())
     else:
-        course_links = {
-            "C++": "https://link_to_cpp_course",
-            "Java": "https://link_to_java_course",
-            "Python": "https://link_to_python_course",
-            "BlackHat Hacking": "https://link_to_blackhat_course",
-            "Ethical Hacking": "https://link_to_ethical_course",
-            "Linux": "https://link_to_linux_course",
-            "Cyber Security": "https://link_to_cyber_course",
-        }
-        link = course_links.get(text)
-        if link:
-            bot.send_message(chat_id, f"Here is your course: {link}")
+        url = COURSE_URLS.get(text)
+        if url:
+            content = fetch_course_text(url)
+            bot.send_message(chat_id, f"📖 *{text} Course Content:*\n\n{content}", parse_mode="Markdown", disable_web_page_preview=True)
+        else:
+            bot.send_message(chat_id, "⚠️ This course is not available yet.")
+# -------------------------
+# External Course Hosting Map
+# -------------------------
+COURSE_URLS = {
+    # Programming
+    "C++": "https://mruser96.42web.io/courses/c.txt",
+    "Java": "https://mruser96.42web.io/courses/java.txt",
+    "JavaScript": "https://mruser96.42web.io/courses/javascript.txt",
+    "Python": "https://mruser96.42web.io/courses/python.txt",
+
+    # Hacking & Cybersecurity
+    "BlackHat Hacking": "https://mruser96.42web.io/courses/blackhat.txt",
+    "Ethical Hacking": "https://mruser96.42web.io/courses/ethical.txt",
+    "Android Hacking": "https://mruser96.42web.io/courses/android_hacking.txt",
+    "WiFi Hacking": "https://mruser96.42web.io/courses/wifi.txt",
+    "Binning (by BlackHat)": "https://mruser96.42web.io/courses/binning.txt",
+    "Antivirus Development": "https://mruser96.42web.io/courses/antivirus.txt",
+    "Phishing App Development": "https://mruser96.42web.io/courses/phishing.txt",
+    "PUBG Hack Development": "https://mruser96.42web.io/courses/pubg.txt",
+    "APK Modding 20+ Course": "https://mruser96.42web.io/courses/apk_modding.txt",
+
+    # System & OS
+    "Linux": "https://mruser96.42web.io/courses/linux.txt",
+    "PowerShell": "https://mruser96.42web.io/courses/powershell.txt",
+
+    # Special Tools
+    "Telegram Number": "https://mruser96.42web.io/courses/tg_number.txt",
+    "Lifetime RDP": "https://mruser96.42web.io/courses/rdp.txt",
+    "Call Any Indian Number Free": "https://mruser96.42web.io/courses/call.txt",
+    "Make Own SMS Bomber": "https://mruser96.42web.io/courses/sms_bomber.txt",
+    "Own Temporary Mail Bot": "https://mruser96.42web.io/courses/temp_mail.txt",
+
+    # Premium Bundle
+    "Cyber Security": "https://mruser96.42web.io/courses/cyber.txt",
+    "Machine Learning": "https://mruser96.42web.io/courses/ml.txt",
+    "Pro Music Production": "https://mruser96.42web.io/courses/music.txt",
+    "Photoshop CC": "https://mruser96.42web.io/courses/photoshop.txt",
+}
+
+def fetch_course_text(url: str) -> str:
+    """Fetch .txt content from hosting URL"""
+    try:
+        resp = requests.get(url, timeout=8)
+        if resp.status_code == 200:
+            return resp.text.strip()
+        else:
+            return "❌ Failed to fetch course material. Try again later."
+    except Exception:
+        return "❌ Error fetching course content."
 
 # -------------------------
 # Flask Routes (webhook)
