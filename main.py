@@ -506,7 +506,7 @@ def handle_menu(message):
             uresp = supabase.table("users").select("*").eq("telegram_id", message.from_user.id).single().execute()
             user_row = uresp.data
             if user_row:
-                USER_CACHE[message.from_user.id] = (user_row.get("status"), time.time()+USER_CACHE_TTL, user_row)
+                USER_CACHE[message.from_user.id] = (user_row.get("status"), time.time() + USER_CACHE_TTL, user_row)
         except Exception:
             user_row = None
 
@@ -525,13 +525,14 @@ def handle_menu(message):
         bot.send_message(chat_id, "Select a course:", reply_markup=premium_courses_keyboard())
     elif text == "⬅ Back":
         bot.send_message(chat_id, "Main Menu:", reply_markup=main_menu_keyboard())
-   else:
-    course = COURSE_DATA.get(text)
-    if course:
-        msg = f"{course['description']}\n\n🔗 Download: {course['link']}"
-        bot.send_message(chat_id, msg)
     else:
-        bot.send_message(chat_id, "⚠️ This course is not available yet.")
+        course = COURSE_DATA.get(text)
+        if course:
+            msg = f"{course['description']}\n\n🔗 Download: {course['link']}"
+            bot.send_message(chat_id, msg)
+        else:
+            bot.send_message(chat_id, "⚠️ This course is not available yet.")
+
 
 # -------------------------
 # External Course Hosting Map
