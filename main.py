@@ -582,6 +582,11 @@ def fetch_course_text(url: str) -> str:
     except Exception:
         return "❌ Error fetching course content."
 
+            text = resp.text.strip()
+            # fix Google Drive links automatically
+            text = text.replace("usp=drivelink", "")
+            return text
+
 # -------------------------
 # Flask Routes (webhook)
 # -------------------------
