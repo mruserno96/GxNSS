@@ -49,6 +49,15 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # -------------------------
 # Constants
 # -------------------------
+
+# -------------------------
+# Channel / Join-check config
+# -------------------------
+CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME", "@GxNSSupdates")
+CHANNEL_URL = f"https://t.me/{CHANNEL_USERNAME.lstrip('@')}"
+
+
+
 UPI_ID = "MillionaireNaitik69@fam"
 QR_IMAGE_URL = "https://mruser96.42web.io/qr.jpg?nocache="
 COURSES_MESSAGE = (
@@ -109,6 +118,29 @@ def invalidate_user_cache(telegram_id):
 # -------------------------
 # Helpers
 # -------------------------
+
+def is_member_of_channel(user_id: int) -> bool:
+    """
+    Return True if the user is a member of CHANNEL_USERNAME (or False otherwise).
+    Requires the bot to be admin in the channel to reliably check membership.
+    """
+    try:
+        # get_chat_member will raise if bot lacks permission or user isn't found
+        cm = bot.get_chat_member(CHANNEL_USERNAME, user_id)
+        status = getattr(cm, "status", None)
+        # statuses like 'left' or 'kicked' mean not a member
+        if status in ("left", "kicked", None):
+            return False
+        # 'member', 'administrator', 'creator', 'restricted' -> treat as joined
+        return True
+    except Exception as e:
+        # Could be ApiException if bot is not admin or username invalid.
+        logger.info("is_member_of_channel check failed for user %s: %s", user_id, e)
+        # Fail-safe: treat as not member
+        return False
+
+
+
 def is_admin(user_id: int) -> bool:
     try:
         return int(user_id) in ADMIN_IDS
@@ -268,8 +300,8 @@ def send_welcome(message):
         message.from_user.last_name
     )
 
+    # premium users: same as before
     if user and user.get("status") == "premium":
-        # Directly show premium menu keyboard
         bot.send_message(
             cid,
             "🎉 Welcome back Premium User!",
@@ -277,20 +309,51 @@ def send_welcome(message):
         )
         return
 
-    # Normal users: unchanged promo/payment flow
-    sent = bot.send_message(cid, COURSES_MESSAGE, parse_mode="Markdown")
+    # NON-PREMIUM: check channel membership first
     try:
-        save_message(user["id"], cid, sent.message_id)
+        joined = is_member_of_channel(message.from_user.id)
     except Exception:
-        pass
+        joined = False
 
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("Buy Course For ₹79", callback_data="buy"))
-    sent2 = bot.send_message(cid, PROMO_MESSAGE, parse_mode="Markdown", reply_markup=markup)
-    try:
-        save_message(user["id"], cid, sent2.message_id)
-    except Exception:
-        pass
+    if joined:
+        # Show courses + promo as before
+        sent = bot.send_message(cid, COURSES_MESSAGE, parse_mode="Markdown")
+        try:
+            save_message(user["id"], cid, sent.message_id)
+        except Exception:
+            pass
+
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("Buy Course For ₹79", callback_data="buy"))
+        sent2 = bot.send_message(cid, PROMO_MESSAGE, parse_mode="Markdown", reply_markup=markup)
+        try:
+            save_message(user["id"], cid, sent2.message_id)
+        except Exception:
+            pass
+        return
+    else:
+        # Not joined -> show Join + Try Again buttons
+        kb = types.InlineKeyboardMarkup()
+        # join button uses URL
+        kb.add(types.InlineKeyboardButton("🔗 Join Channel", url=CHANNEL_URL))
+        # try again callback to re-check membership
+        kb.add(types.InlineKeyboardButton("✅ Try Again", callback_data="check_join"))
+
+        sent_msg = bot.send_message(
+            cid,
+            f"💬 *Please join our Telegram channel first to access courses.*\n\n"
+            f"Channel: {CHANNEL_USERNAME}\n\n"
+            "Click *Join Channel* then come back and press *Try Again*.",
+            parse_mode="Markdown",
+            reply_markup=kb
+        )
+        try:
+            # save for possible cleanup
+            if user:
+                save_message(user["id"], cid, sent_msg.message_id)
+        except Exception:
+            pass
+        return
 
 # -------------------------
 # Inline callback handlers (Buy + I Paid)
@@ -350,6 +413,64 @@ def handle_paid(call):
             save_message(user["id"], cid, sent.message_id)
     except Exception:
         pass
+    
+   
+
+# -------------------------
+# Callback handler for "Try Again" join check
+# -------------------------
+@bot.callback_query_handler(func=lambda c: c.data == "check_join")
+def handle_check_join(call):
+    """User clicked 'Try Again' — re-check membership and either show content or prompt again."""
+    try:
+        bot.answer_callback_query(call.id)
+    except Exception:
+        pass
+
+    cid = call.message.chat.id
+    uid = call.from_user.id
+
+    if is_member_of_channel(uid):
+        # user joined — send the regular non-premium start flow
+        try:
+            sent = bot.send_message(cid, COURSES_MESSAGE, parse_mode="Markdown")
+            user = get_user_cached(uid) or supabase.table("users").select("*").eq("telegram_id", uid).single().execute().data
+            if user:
+                try:
+                    save_message(user["id"], cid, sent.message_id)
+                except Exception:
+                    pass
+
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("Buy Course For ₹79", callback_data="buy"))
+            sent2 = bot.send_message(cid, PROMO_MESSAGE, parse_mode="Markdown", reply_markup=markup)
+            if user:
+                try:
+                    save_message(user["id"], cid, sent2.message_id)
+                except Exception:
+                    pass
+        except Exception as e:
+            logger.exception("Error sending courses after successful join: %s", e)
+            try:
+                bot.send_message(cid, "✅ You are a channel member — but I couldn't send the content right now. Try again later.")
+            except Exception:
+                pass
+    else:
+        # still not a member
+        kb = types.InlineKeyboardMarkup()
+        kb.add(types.InlineKeyboardButton("🔗 Join Channel", url=CHANNEL_URL))
+        kb.add(types.InlineKeyboardButton("✅ Try Again", callback_data="check_join"))
+        try:
+            bot.send_message(
+                cid,
+                f"💬 You still need to join {CHANNEL_USERNAME} before continuing.\n\n"
+                f"Click *Join Channel* and then *Try Again*.",
+                parse_mode="Markdown",
+                reply_markup=kb
+            )
+        except Exception:
+            pass
+
 
 # -------------------------
 # Upload handler (photo/document)
