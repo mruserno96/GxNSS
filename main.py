@@ -225,7 +225,7 @@ def main_menu_keyboard():
 
 def programming_courses_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    markup.add("C++", "Java", "JavaScript", "Python", "⬅ Back")
+    markup.add("💻 C++", "☕️ Java ", "JavaScript", "Python", "⬅ Back")
     return markup
 
 def hacking_courses_keyboard():
@@ -545,7 +545,7 @@ COURSE_DATA = {
         ),
         "link": "https://drive.google.com/file/d/1Ur5T9dGb_e5EBNJzpTg08ieSHKxwBoeQ/view"
     },
-    "Java": {
+    "☕️ Java ": {
    "description": (
         "🚀 Master Java Programming Today! 👨‍💻\n\n"
         "📘 Exclusive JAVA Learning PDFs\n"
@@ -814,7 +814,7 @@ COURSE_DATA = {
     "link": "https://drive.google.com/file/d/1_yvmp1Httou9u06-EjxPy5V9e2qFk9ob/view"
 },
 
-"How to Make Own Temporary Mail Bot.":{
+"How to Make Own Temporary Mail Bot":{
    "description": (
             "📬 HOW TO CREATE YOUR OWN TEMP MAIL TELEGRAM BOT 📬\n\n"
         "🚀 Learn how to make a fully functional temporary mail bot for Telegram from scratch!\n\n"
