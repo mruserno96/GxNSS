@@ -2,6 +2,7 @@ import os
 import logging
 import threading
 import time
+import random
 import requests
 from datetime import datetime
 from flask import Flask, request, abort
@@ -1052,16 +1053,26 @@ def telegram_webhook():
     return "OK", 200
 
 # -------------------------
-# Auto Ping
+# -------------------------
+# Auto Ping with backoff
 # -------------------------
 def auto_ping():
+    base_delay = 300  # normal interval in seconds (5 minutes)
+    max_retry_delay = 600  # max delay on failure (10 minutes)
+
     while True:
         try:
             if WEBHOOK_URL:
-                requests.get(WEBHOOK_URL, timeout=10)
-        except Exception:
-            pass
-        time.sleep(300)
+                response = requests.get(WEBHOOK_URL, timeout=10)
+                if response.status_code != 200:
+                    logger.warning("Auto ping returned status code %s", response.status_code)
+            # success, reset delay to normal
+            sleep_time = base_delay
+        except Exception as e:
+            logger.warning("Auto ping failed: %s", e)
+            # exponential backoff with jitter
+            sleep_time = min(base_delay * 2, max_retry_delay) + random.randint(0, 30)
+        time.sleep(sleep_time)
 
 # -------------------------
 # Run Locally
