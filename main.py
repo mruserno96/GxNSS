@@ -43,7 +43,7 @@ UPLOAD_FOLDER_PREFIX = os.getenv("UPLOAD_FOLDER_PREFIX", "payments")
 # -------------------------
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-bot = telebot.TeleBot(BOT_TOKEN, threaded=True, num_threads=5)
+bot = telebot.TeleBot(BOT_TOKEN, threaded=True, num_threads=20)
 app = Flask(__name__)
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
