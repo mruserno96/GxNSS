@@ -1080,3 +1080,113 @@ def auto_ping():
 if __name__ == "__main__":
     threading.Thread(target=auto_ping, daemon=True).start()
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
+\n
+# ------- Robust helpers inserted by merger -------
+import threading as __threading_helper
+USER_CACHE_LOCK = __threading_helper.RLock()
+
+def bot_safe_call(func, *args, **kwargs):
+    try:
+        return func(*args, **kwargs)
+    except Exception as e:
+        logger.exception("Telegram API error in %s: %s", getattr(func, '__name__', func), e)
+        return None
+
+def supabase_safe_execute(callable_query):
+    try:
+        resp = callable_query()
+        data = None
+        if hasattr(resp, "data"):
+            data = resp.data
+        elif isinstance(resp, dict) and "data" in resp:
+            data = resp["data"]
+        elif isinstance(resp, (list, tuple)):
+            data = resp
+        return True, data
+    except Exception as e:
+        logger.exception("Supabase call failed: %s", e)
+        return False, e
+
+# End helpers
+
+def get_user_cached(telegram_id):
+    \"\"\"Return user row from cache or DB. Cache only status and id for speed.\"\"\"
+    now = time.time()
+    try:
+        t = int(telegram_id)
+    except Exception:
+        t = telegram_id
+    with USER_CACHE_LOCK:
+        cached = USER_CACHE.get(t)
+        if cached:
+            status, expire_ts, user_row = cached
+            if expire_ts > now:
+                return user_row
+            else:
+                USER_CACHE.pop(t, None)
+    ok, data = supabase_safe_execute(lambda: supabase.table("users").select("*").eq("telegram_id", t).limit(1).execute())
+    user_row = None
+    try:
+        if ok and data:
+            if isinstance(data, list):
+                user_row = data[0] if data else None
+            else:
+                user_row = data
+    except Exception:
+        user_row = None
+    expire_ts = now + USER_CACHE_TTL
+    with USER_CACHE_LOCK:
+        USER_CACHE[t] = (user_row.get("status") if user_row else None, expire_ts, user_row)
+    return user_row
+
+def upload_to_supabase(bucket, object_path, file_bytes, content_type="image/jpeg"):
+    object_path = object_path.lstrip("/")
+    storage = supabase.storage.from_(bucket)
+    try:
+        try:
+            storage.remove([object_path])
+        except Exception:
+            pass
+        storage.upload(object_path, file_bytes, {"content-type": content_type})
+        public = storage.get_public_url(object_path)
+        return True, object_path, public
+    except Exception as e:
+        logger.exception("Supabase storage upload failed: %s", e)
+        return False, None, str(e)
+
+def find_or_create_user(telegram_id, username, first_name=None, last_name=None):
+    try:
+        t = int(telegram_id)
+    except Exception:
+        t = telegram_id
+    ok, data = supabase_safe_execute(lambda: supabase.table("users").select("*").eq("telegram_id", t).limit(1).execute())
+    user = None
+    if ok and data:
+        if isinstance(data, list):
+            user = data[0] if data else None
+        else:
+            user = data
+    if user:
+        with USER_CACHE_LOCK:
+            USER_CACHE[t] = (user.get("status"), time.time() + USER_CACHE_TTL, user)
+        return user
+    new_user = {
+        "telegram_id": t,
+        "username": username,
+        "first_name": first_name,
+        "last_name": last_name,
+        "status": "normal",
+        "pending_upload": False,
+        "created_at": datetime.utcnow().isoformat(),
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+    ok, data = supabase_safe_execute(lambda: supabase.table("users").insert(new_user).execute())
+    if ok and data:
+        if isinstance(data, list):
+            user = data[0]
+        else:
+            user = data
+        with USER_CACHE_LOCK:
+            USER_CACHE[t] = (user.get("status"), time.time() + USER_CACHE_TTL, user)
+        return user
+    return None
