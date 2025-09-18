@@ -544,13 +544,12 @@ def admin_help(message):
     markup.add("⬆️ Upgrade User", "💎 All Premium Users")
 
     bot.send_message(
-        message.chat.id,
-        "👮 *Admin Panel*
+    message.chat.id,
+    "👮 *Admin Panel*\n\nChoose an option below:",
+    parse_mode="Markdown",
+    reply_markup=markup
+)
 
-Choose an option below:",
-        parse_mode="Markdown",
-        reply_markup=markup
-    )
 @bot.message_handler(commands=["allpremiumuser"])
 def admin_allpremiumuser(message):
     # ensure the caller is admin
