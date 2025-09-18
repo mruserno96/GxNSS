@@ -1080,7 +1080,7 @@ def auto_ping():
 if __name__ == "__main__":
     threading.Thread(target=auto_ping, daemon=True).start()
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
-\n
+    
 # ------- Robust helpers inserted by merger -------
 import threading as __threading_helper
 USER_CACHE_LOCK = __threading_helper.RLock()
