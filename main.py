@@ -1110,8 +1110,10 @@ def supabase_safe_execute(callable_query):
 # End helpers
 
 def get_user_cached(telegram_id):
-    \"\"\"Return user row from cache or DB. Cache only status and id for speed.\"\"\"
+    """Return user row from cache or DB. Cache only status and id for speed."""
     now = time.time()
+
+
     try:
         t = int(telegram_id)
     except Exception:
