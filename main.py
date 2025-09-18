@@ -538,12 +538,19 @@ def handle_upload(message):
 def admin_help(message):
     if not is_admin(message.from_user.id):
         return
-    bot.reply_to(message, (
-        "👮 *Admin Commands*\n\n"
-        "/upgrade <userid|username> – Upgrade manually\n"
-        "/allpremiumuser – View all Premium users"
-    ), parse_mode="Markdown")
 
+    # Create a reply keyboard
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    markup.add("⬆️ Upgrade User", "💎 All Premium Users")
+
+    bot.send_message(
+        message.chat.id,
+        "👮 *Admin Panel*
+
+Choose an option below:",
+        parse_mode="Markdown",
+        reply_markup=markup
+    )
 @bot.message_handler(commands=["allpremiumuser"])
 def admin_allpremiumuser(message):
     # ensure the caller is admin
