@@ -546,7 +546,7 @@ def handle_upload(message):
         "Admin will verify your payment shortly. If approved, you'll be upgraded to Premium. 🚀",
         parse_mode="Markdown"
     )
- for aid in ADMIN_IDS:
+for aid in ADMIN_IDS:
     try:
         markup = types.InlineKeyboardMarkup()
         markup.add(
@@ -562,6 +562,7 @@ def handle_upload(message):
         )
     except Exception:
         pass
+
 
 
 
