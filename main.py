@@ -727,26 +727,28 @@ def admin_upgrade(message):
 @bot.message_handler(func=lambda message: True)
 def handle_menu(message):
     text = message.text
-    # --- Admin Keyboard Handling ---
+    chat_id = message.chat.id
+
+    # --- Admin Keyboard Handling (runs first, before premium check) ---
     if is_admin(message.from_user.id):
         state = ADMIN_STATES.get(message.from_user.id)
         if text == ADMIN_KB_BUTTON_ALL_PREMIUM:
             admin_allpremiumuser(message)
             return
         if text == ADMIN_KB_BUTTON_UPGRADE:
-            ADMIN_STATES[message.from_user.id] = {'mode':'await_upgrade'}
-            bot.send_message(chat_id, 'Please enter the target: <user_id> or @username')
+            ADMIN_STATES[message.from_user.id] = {'mode': 'await_upgrade'}
+            bot.send_message(chat_id, "Please enter the target: <user_id> or @username")
             return
         if text == ADMIN_KB_BUTTON_CANCEL:
             ADMIN_STATES.pop(message.from_user.id, None)
-            bot.send_message(chat_id, 'Cancelled.')
+            bot.send_message(chat_id, "Cancelled.")
             return
-        if state and state.get('mode')=='await_upgrade':
+        if state and state.get("mode") == "await_upgrade":
             ADMIN_STATES.pop(message.from_user.id, None)
             _perform_upgrade_by_target(text.strip(), chat_id)
             return
-    chat_id = message.chat.id
 
+    # --- Normal Premium User Menu ---
     user_row = get_user_cached(message.from_user.id)
     if not user_row:
         try:
@@ -759,6 +761,7 @@ def handle_menu(message):
 
     if not user_row or user_row.get("status") != "premium":
         return
+
 
     if text == "🔹 Programming Courses":
         bot.send_message(chat_id, "Select a course:", reply_markup=programming_courses_keyboard())
