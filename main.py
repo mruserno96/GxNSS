@@ -148,27 +148,10 @@ def is_admin(user_id: int) -> bool:
     except Exception:
         return False
 
-def notify_admins_payment(user, urow, payment, url):
-    """Notify all admins about a new payment upload."""
+def notify_admins(text):
     if not ADMIN_IDS:
         return
     for aid in ADMIN_IDS:
-        try:
-            markup = types.InlineKeyboardMarkup()
-            markup.add(
-                types.InlineKeyboardButton("✅ Approve", callback_data=f"approve_payment:{payment['id']}"),
-                types.InlineKeyboardButton("❌ Reject", callback_data=f"reject_payment:{payment['id']}")
-            )
-            bot.send_message(
-                aid,
-                f"🆕 Payment uploaded by @{user.username or user.id}\n"
-                f"UserID: {urow.get('id')}\n"
-                f"URL: {url}",
-                reply_markup=markup
-            )
-        except Exception:
-            pass
-
         try:
             bot.send_message(aid, text, disable_web_page_preview=True)
         except Exception:
@@ -530,7 +513,7 @@ def handle_upload(message):
         return
 
     try:
-        payment = create_payment(urow, object_path, url, user.username or "")
+        create_payment(urow, object_path, url, user.username or "")
     except Exception:
         bot.reply_to(message, "❌ Failed to record your payment. Please try again.")
         return
@@ -546,25 +529,7 @@ def handle_upload(message):
         "Admin will verify your payment shortly. If approved, you'll be upgraded to Premium. 🚀",
         parse_mode="Markdown"
     )
-for aid in ADMIN_IDS:
-    try:
-        markup = types.InlineKeyboardMarkup()
-        markup.add(
-            types.InlineKeyboardButton("✅ Approve", callback_data=f"approve_payment:{payment['id']}"),
-            types.InlineKeyboardButton("❌ Reject", callback_data=f"reject_payment:{payment['id']}")
-        )
-        bot.send_message(
-            aid,
-            f"🆕 Payment uploaded by @{user.username or user.id}\n"
-            f"UserID: {urow.get('id')}\n"
-            f"URL: {url}",
-            reply_markup=markup
-        )
-    except Exception:
-        pass
-
-
-
+    notify_admins(f"🆕 Payment uploaded by @{user.username or user.id}\nUserID: {urow.get('id')}\nURL: {url}")
 
 # -------------------------
 # /admin and admin helpers
@@ -1115,102 +1080,3 @@ def auto_ping():
 if __name__ == "__main__":
     threading.Thread(target=auto_ping, daemon=True).start()
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
-
-
-
-# -------------------------
-# Admin Payment Verification (Approve / Reject)
-# -------------------------
-@bot.callback_query_handler(func=lambda c: c.data.startswith("approve_payment:"))
-def handle_approve_payment(call):
-    try:
-        payment_id = int(call.data.split(":")[1])
-    except Exception:
-        bot.answer_callback_query(call.id, "Invalid payment ID")
-        return
-
-    try:
-        presp = supabase.table("payments").select("*").eq("id", payment_id).single().execute()
-        prow = presp.data
-    except Exception:
-        prow = None
-
-    if not prow:
-        bot.answer_callback_query(call.id, "Payment not found")
-        return
-
-    try:
-        supabase.table("users").update({"status": "premium", "updated_at": datetime.utcnow().isoformat()}).eq("id", prow["user_id"]).execute()
-        supabase.table("payments").update({"verified": True}).eq("id", payment_id).execute()
-        uresp = supabase.table("users").select("*").eq("id", prow["user_id"]).single().execute()
-        urow = uresp.data
-        if urow:
-            notify_user_upgrade(urow)
-    except Exception as e:
-        logger.exception("Approve failed: %s", e)
-        bot.answer_callback_query(call.id, "Approve failed")
-        return
-
-    bot.answer_callback_query(call.id, "Payment Approved ✅")
-    bot.send_message(call.message.chat.id, f"✅ Approved payment for user_id {prow['user_id']}")
-    for aid in ADMIN_IDS:
-        try:
-            bot.send_message(aid, f"LOG: ✅ Admin {call.from_user.id} approved payment {payment_id} for user_id {prow['user_id']}")
-        except Exception:
-            pass
-
-@bot.callback_query_handler(func=lambda c: c.data.startswith("reject_payment:"))
-def handle_reject_payment(call):
-    try:
-        payment_id = int(call.data.split(":")[1])
-    except Exception:
-        bot.answer_callback_query(call.id, "Invalid payment ID")
-        return
-
-    try:
-        presp = supabase.table("payments").select("*").eq("id", payment_id).single().execute()
-        prow = presp.data
-    except Exception:
-        prow = None
-
-    if not prow:
-        bot.answer_callback_query(call.id, "Payment not found")
-        return
-
-    try:
-        uresp = supabase.table("users").select("*").eq("id", prow["user_id"]).single().execute()
-        urow = uresp.data
-    except Exception:
-        urow = None
-
-    if urow:
-        username = urow.get("username") or urow.get("telegram_id")
-        try:
-            bot.send_message(
-                urow["telegram_id"],
-                f"@{username} Your Payment Screenshot Rejected ❌\nBecause You Uploaded a Fake Payment Screenshot"
-            )
-        except Exception:
-            pass
-
-    bot.answer_callback_query(call.id, "Payment Rejected ❌")
-    bot.send_message(call.message.chat.id, f"❌ Rejected payment for user_id {prow['user_id']} (no DB update)")
-
-    # 🔔 Notify all admins (log)
-    for aid in ADMIN_IDS:
-        try:
-            bot.send_message(
-                aid,
-                f"LOG: ❌ Admin {call.from_user.id} rejected payment {payment_id} for user_id {prow['user_id']}"
-            )
-        except Exception:
-            pass
-
-
-    bot.answer_callback_query(call.id, "Payment Rejected ❌")
-    bot.send_message(call.message.chat.id, f"❌ Rejected payment for user_id {prow['user_id']} (no DB update)")
-    for aid in ADMIN_IDS:
-        try:
-            bot.send_message(aid, f"LOG: ❌ Admin {call.from_user.id} rejected payment {payment_id} for user_id {prow['user_id']}")
-        except Exception:
-            pass
