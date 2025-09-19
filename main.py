@@ -1140,6 +1140,11 @@ def handle_approve_payment(call):
 
     bot.answer_callback_query(call.id, "Payment Approved ✅")
     bot.send_message(call.message.chat.id, f"✅ Approved payment for user_id {prow['user_id']}")
+    for aid in ADMIN_IDS:
+        try:
+            bot.send_message(aid, f"LOG: ✅ Admin {call.from_user.id} approved payment {payment_id} for user_id {prow['user_id']}")
+        except Exception:
+            pass
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("reject_payment:"))
 def handle_reject_payment(call):
@@ -1177,3 +1182,8 @@ def handle_reject_payment(call):
 
     bot.answer_callback_query(call.id, "Payment Rejected ❌")
     bot.send_message(call.message.chat.id, f"❌ Rejected payment for user_id {prow['user_id']} (no DB update)")
+    for aid in ADMIN_IDS:
+        try:
+            bot.send_message(aid, f"LOG: ❌ Admin {call.from_user.id} rejected payment {payment_id} for user_id {prow['user_id']}")
+        except Exception:
+            pass
