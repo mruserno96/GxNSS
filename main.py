@@ -534,15 +534,60 @@ def handle_upload(message):
 # -------------------------
 # /admin and admin helpers
 # -------------------------
+
+# -------------------------
+# Admin State & Keyboard
+# -------------------------
+ADMIN_STATES = {}
+ADMIN_KB_BUTTON_UPGRADE = "🔼 Upgrade User"
+ADMIN_KB_BUTTON_ALL_PREMIUM = "💎 All Premium Users"
+ADMIN_KB_BUTTON_CANCEL = "❌ Cancel"
+
 @bot.message_handler(commands=["admin"])
 def admin_help(message):
     if not is_admin(message.from_user.id):
         return
-    bot.reply_to(message, (
-        "👮 *Admin Commands*\n\n"
-        "/upgrade <userid|username> – Upgrade manually\n"
-        "/allpremiumuser – View all Premium users"
-    ), parse_mode="Markdown")
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    markup.add(ADMIN_KB_BUTTON_UPGRADE, ADMIN_KB_BUTTON_ALL_PREMIUM)
+    markup.add(ADMIN_KB_BUTTON_CANCEL)
+    bot.send_message(
+        message.chat.id,
+        "👮 *Admin Panel*\n\nChoose an action:",
+        reply_markup=markup,
+        parse_mode="Markdown"
+    )
+
+def _perform_upgrade_by_target(target, chat_id):
+    try:
+        if target.isdigit():
+            resp = supabase.table("users").select("*").eq("id", int(target)).limit(1).execute()
+        else:
+            username_lookup = target.lstrip("@")
+            resp = supabase.table("users").select("*").eq("username", username_lookup).limit(1).execute()
+    except Exception:
+        bot.send_message(chat_id, "❌ Database error while searching for user.")
+        return
+
+    user_row = (resp.data or [None])[0]
+    if not user_row:
+        bot.send_message(chat_id, f"❌ User {target} not found.")
+        return
+
+    if user_row.get("status") == "premium":
+        bot.send_message(chat_id, f"✅ User {target} is already Premium.")
+        return
+
+    try:
+        supabase.table("users").update({"status": "premium", "updated_at": datetime.utcnow().isoformat()}).eq("id", user_row["id"]).execute()
+        supabase.table("payments").update({"verified": True}).eq("user_id", user_row["id"]).execute()
+        invalidate_user_cache(user_row["telegram_id"])
+    except Exception:
+        bot.send_message(chat_id, f"❌ Failed to upgrade {target}.")
+        return
+
+    notify_user_upgrade(user_row)
+    bot.send_message(chat_id, f"✅ User {target} upgraded to Premium!")
+
 
 @bot.message_handler(commands=["allpremiumuser"])
 def admin_allpremiumuser(message):
@@ -682,6 +727,24 @@ def admin_upgrade(message):
 @bot.message_handler(func=lambda message: True)
 def handle_menu(message):
     text = message.text
+    # --- Admin Keyboard Handling ---
+    if is_admin(message.from_user.id):
+        state = ADMIN_STATES.get(message.from_user.id)
+        if text == ADMIN_KB_BUTTON_ALL_PREMIUM:
+            admin_allpremiumuser(message)
+            return
+        if text == ADMIN_KB_BUTTON_UPGRADE:
+            ADMIN_STATES[message.from_user.id] = {'mode':'await_upgrade'}
+            bot.send_message(chat_id, 'Please enter the target: <user_id> or @username')
+            return
+        if text == ADMIN_KB_BUTTON_CANCEL:
+            ADMIN_STATES.pop(message.from_user.id, None)
+            bot.send_message(chat_id, 'Cancelled.')
+            return
+        if state and state.get('mode')=='await_upgrade':
+            ADMIN_STATES.pop(message.from_user.id, None)
+            _perform_upgrade_by_target(text.strip(), chat_id)
+            return
     chat_id = message.chat.id
 
     user_row = get_user_cached(message.from_user.id)
