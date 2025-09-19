@@ -551,10 +551,14 @@ def handle_upload(message):
             markup = types.InlineKeyboardMarkup()
             markup.add(types.InlineKeyboardButton("✅ Approve", callback_data=f"approve_payment:{payment['id']}"),
                        types.InlineKeyboardButton("❌ Reject", callback_data=f"reject_payment:{payment['id']}"))
-            bot.send_message(aid, f"🆕 Payment uploaded by @{user.username or user.id}
-UserID: {urow.get('id')}
-URL: {url}",
-                             reply_markup=markup)
+         bot.send_message(
+    aid,
+    f"🆕 Payment uploaded by @{user.username or user.id}\n"
+    f"UserID: {urow.get('id')}\n"
+    f"URL: {url}",
+    reply_markup=markup
+)
+
         except Exception:
             pass
 
