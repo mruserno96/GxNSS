@@ -59,7 +59,7 @@ CHANNEL_URL = f"https://t.me/{CHANNEL_USERNAME.lstrip('@')}"
 
 
 
-UPI_ID = "MillionaireNaitik69@fam"
+UPI_ID = "2xClubWinSharma@fam"
 QR_IMAGE_URL = "https://mruser96.42web.io/qr.jpg?nocache="
 COURSES_MESSAGE = (
     "📚 *GxNSS COURSES*\n\n"
