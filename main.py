@@ -148,21 +148,27 @@ def is_admin(user_id: int) -> bool:
     except Exception:
         return False
 
-def for aid in ADMIN_IDS:
-        try:
-            markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton("✅ Approve", callback_data=f"approve_payment:{payment['id']}"),
-                       types.InlineKeyboardButton("❌ Reject", callback_data=f"reject_payment:{payment['id']}"))
-            bot.send_message(aid, f"🆕 Payment uploaded by @{user.username or user.id}
-UserID: {urow.get('id')}
-URL: {url}",
-                             reply_markup=markup)
-        except Exception:
-            pass
-:
+def notify_admins_payment(user, urow, payment, url):
+    """Notify all admins about a new payment upload."""
     if not ADMIN_IDS:
         return
     for aid in ADMIN_IDS:
+        try:
+            markup = types.InlineKeyboardMarkup()
+            markup.add(
+                types.InlineKeyboardButton("✅ Approve", callback_data=f"approve_payment:{payment['id']}"),
+                types.InlineKeyboardButton("❌ Reject", callback_data=f"reject_payment:{payment['id']}")
+            )
+            bot.send_message(
+                aid,
+                f"🆕 Payment uploaded by @{user.username or user.id}\n"
+                f"UserID: {urow.get('id')}\n"
+                f"URL: {url}",
+                reply_markup=markup
+            )
+        except Exception:
+            pass
+
         try:
             bot.send_message(aid, text, disable_web_page_preview=True)
         except Exception:
