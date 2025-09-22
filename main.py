@@ -407,6 +407,13 @@ def handle_ping(message: telebot.types.Message):
         logger.debug("ping handler error: %s", e)
 
 
+
+
+
+
+
+
+
 @bot.message_handler(commands=['start'])
 def handle_start(message: telebot.types.Message):
     user_id = message.from_user.id
@@ -417,12 +424,12 @@ def handle_start(message: telebot.types.Message):
     with _lock:
         last_start_args[user_id] = args
 
-    # --- enforce channel join for normal users (owner/admin bypass) ---
+    # --- Enforce channel join for normal users (owner/admin bypass) ---
     try:
-        if user_id != OWNER_ID and not is_admin(user_id):
+        if not is_owner(user_id) and not is_admin(user_id):  # Check if the user is neither owner nor admin
             ok1 = is_channel_member(user_id, CHANNEL_ID) if CHANNEL_ID else False
             ok2 = is_channel_member(user_id, CHANNEL_ID2) if CHANNEL_ID2 else True
-            if not (ok1 and ok2):
+            if not (ok1 and ok2):  # If the user is not in either channel
                 try:
                     bot_call(
                         bot.send_message,
@@ -435,9 +442,9 @@ def handle_start(message: telebot.types.Message):
                     safe_reply(message, "⚠️ Please join the channel: " + CHANNEL_LINK)
                 return
     except Exception as e:
-        logger.debug("channel check failed: %s", e)
+        logger.debug("Channel check failed: %s", e)
 
-    # cache username if available
+    # Cache username if available
     if username:
         try:
             supabase_call(lambda: supabase.table("users")
@@ -447,9 +454,9 @@ def handle_start(message: telebot.types.Message):
                           )
                           .execute())
         except Exception as e:
-            logger.debug("user upsert error: %s", e)
+            logger.debug("User upsert error: %s", e)
 
-    # if /start has token -> send temporary video
+    # If /start has token -> send temporary video
     if len(args) > 1:
         token = args[1]
         try:
@@ -460,19 +467,15 @@ def handle_start(message: telebot.types.Message):
             file_id = resp.data[0]["file_id"]
             send_temp_video(message.chat.id, file_id, delay_seconds=VIDEO_DELETE_MINUTES * 60, user_id=user_id)
         except Exception as e:
-            logger.exception("start token error: %s", e)
+            logger.exception("Start token error: %s", e)
             safe_reply(message, "❌ Error fetching the video. Try again later.")
         return
 
     # owner/admin UI
-
-
-
-
- # owner/admin UI
-    if user_id == OWNER_ID:
+    if is_owner(user_id):
         bot_call(bot.send_message, message.chat.id, "👑 Welcome Owner! Use the buttons below:", reply_markup=get_owner_keyboard())
         return
+
     if is_admin(user_id):
         if username:
             try:
@@ -482,7 +485,7 @@ def handle_start(message: telebot.types.Message):
         bot_call(bot.send_message, message.chat.id, "👋 Welcome Admin! You can manage videos.", reply_markup=get_admin_keyboard())
         return
 
-    # normal user welcome
+    # Normal user welcome
     safe_reply(message, """Welcome! You’ve Joined Successfully ✅
 
 👋 Hello there!
@@ -499,9 +502,9 @@ def handle_try_again(call: telebot.types.CallbackQuery):
     active_users.add(user_id)
     args = last_start_args.get(user_id, ["/start"])
 
-    # --- re-check channel membership ---
+    # --- Re-check channel membership ---
     try:
-        if user_id != OWNER_ID and not is_admin(user_id):
+        if not is_owner(user_id) and not is_admin(user_id):  # Check if the user is neither owner nor admin
             ok1 = is_channel_member(user_id, CHANNEL_ID) if CHANNEL_ID else False
             ok2 = is_channel_member(user_id, CHANNEL_ID2) if CHANNEL_ID2 else True
             if not (ok1 and ok2):
@@ -517,7 +520,7 @@ def handle_try_again(call: telebot.types.CallbackQuery):
                     safe_send(chat_id, "⚠️ Please join the channel: " + CHANNEL_LINK)
                 return
     except Exception as e:
-        logger.debug("try_again channel check failed: %s", e)
+        logger.debug("Try_again channel check failed: %s", e)
 
     if len(args) > 1:
         token = args[1]
@@ -529,18 +532,26 @@ def handle_try_again(call: telebot.types.CallbackQuery):
             file_id = resp.data[0]["file_id"]
             send_temp_video(chat_id, file_id, delay_seconds=VIDEO_DELETE_MINUTES * 60, user_id=user_id)
         except Exception as e:
-            logger.exception("try_again error: %s", e)
+            logger.exception("Try_again error: %s", e)
             bot_call(bot.send_message, chat_id, "❌ Error retrieving the video. Try again later.")
     else:
-       bot_call(bot.send_message, chat_id, "✅ You joined! Now you can use the bot.\n\n"  
+        bot_call(bot.send_message, chat_id, "✅ You joined! Now you can use the bot.\n\n"  
+                                             "👋 Hello there!\n"
+                                             "To unlock exclusive premium videos, join our special channel now! 🔥🎥\n\n"
+                                             "🔗 Join Here: https://t.me/+iVhgogd-M4wwNGY1\n\n"
+                                             "✨ Don’t miss out on high-quality, exclusive content — available only for our premium members! 🚀", protect_content=True)
 
-"👋 Hello there!\n"
-"To unlock exclusive premium videos, join our special channel now! 🔥🎥\n\n"
 
-"🔗 Join Here: https://t.me/+iVhgogd-M4wwNGY1\n\n"
 
-"✨ Don’t miss out on high-quality, exclusive content — available only for our premium members! 🚀"
-                , protect_content=True)
+
+
+
+
+
+
+
+
+
 
 
 
