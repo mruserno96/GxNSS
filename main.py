@@ -1,25 +1,3 @@
-
-# main_fixed.py
-# Fixed version of the Telegram bot code provided by the user.
-# Changes/fixes applied:
-# - Avoid Telegram "can't parse entities" errors by not forcing a markdown parse mode
-#   when composing dynamic messages (use plain text). Where Markdown was required,
-#   we escape properly and use MarkdownV2 carefully.
-# - Simplified admin listing to only include user_id and username (skip username if empty)
-# - Premiums listing fixed to escape dynamic text and send as plain text to avoid parse issues
-# - /start default message changed to "Hello Welcome to Java Bot."
-# - Minor robustness improvements and centralized safe send helpers
-# - All original logic preserved; Supabase calls still use same table names.
-#
-# IMPORTANT:
-# - Update environment variables BOT_TOKEN, SUPABASE_URL, SUPABASE_KEY, WEBHOOK_URL, OWNER_ID etc.
-# - This file is meant to be a drop-in replacement for your original main.py
-# - If you want Markdown formatting, re-enable parse_mode carefully and escape values.
-#
-# NOTE: This file intentionally avoids sending many messages with Markdown parse modes
-# to prevent "can't parse entities" errors that happen when usernames or other dynamic
-# fields contain characters that break Markdown parsing.
-
 import os
 import time
 import random
@@ -53,7 +31,9 @@ CHANNEL_ID = int(os.getenv("CHANNEL_ID", "0"))
 CHANNEL_LINK = os.getenv("CHANNEL_LINK", "")
 CHANNEL_ID2 = int(os.getenv("CHANNEL_ID2", "0"))
 CHANNEL_LINK2 = os.getenv("CHANNEL_LINK2", "")
-OWNER_ID = int(os.getenv("OWNER_ID", "0"))  # set to your owner id
+OWNER_ID = int(os.getenv("OWNER_ID", "0")) # set to your owner id
+OWNER_ID_LIST = [int(id.strip()) for id in OWNER_ID.split(',')]  # Split and convert each ID to an integer
+
 UPI_ID = os.getenv("UPI_ID", "your_upi@bank")
 QR_IMAGE_URL = os.getenv("QR_IMAGE_URL", "https://mruser96.42web.io/uservip.jpg")
 
@@ -79,7 +59,7 @@ last_start_args: Dict[int, list] = {}
 scheduled_deletes: Dict[str, threading.Timer] = {}
 active_users: set[int] = set()
 
-FREE_VIEW_LIMIT = 7
+FREE_VIEW_LIMIT = 3
 VIDEO_DELETE_MINUTES = 15
 
 # ---------------- Utilities ----------------
@@ -223,6 +203,12 @@ def get_admin_keyboard():
     return kb
 
 # ---------------- DB helpers ----------------
+
+
+def is_owner(user_id: int) -> bool:
+    """Check if the user is an owner by comparing against a list of OWNER_IDs."""
+    return user_id in OWNER_ID_LIST
+
 def is_admin(user_id: int) -> bool:
     try:
         resp = supabase_call(lambda: supabase.table("admins").select("user_id").eq("user_id", user_id).execute())
