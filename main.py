@@ -33,6 +33,7 @@ CHANNEL_ID2 = int(os.getenv("CHANNEL_ID2", "0"))
 CHANNEL_LINK2 = os.getenv("CHANNEL_LINK2", "")
 OWNER_ID = int(os.getenv("OWNER_ID", "0")) # set to your owner id
 OWNER_ID_LIST = [int(id.strip()) for id in OWNER_ID.split(',')]  # Split and convert each ID to an integer
+# ---------------- Config (env) ----------------
 
 UPI_ID = os.getenv("UPI_ID", "your_upi@bank")
 QR_IMAGE_URL = os.getenv("QR_IMAGE_URL", "https://mruser96.42web.io/uservip.jpg")
@@ -426,7 +427,7 @@ def handle_start(message: telebot.types.Message):
 
     # --- Enforce channel join for normal users (owner/admin bypass) ---
     try:
-        if not is_owner(user_id) and not is_admin(user_id):  # Check if the user is neither owner nor admin
+        if user_id not in OWNER_ID_LIST and not is_admin(user_id):  # Check if the user is neither owner nor admin
             ok1 = is_channel_member(user_id, CHANNEL_ID) if CHANNEL_ID else False
             ok2 = is_channel_member(user_id, CHANNEL_ID2) if CHANNEL_ID2 else True
             if not (ok1 and ok2):  # If the user is not in either channel
@@ -472,7 +473,7 @@ def handle_start(message: telebot.types.Message):
         return
 
     # owner/admin UI
-    if is_owner(user_id):
+    if user_id in OWNER_ID_LIST:  # Check if the user is in the OWNER_ID_LIST
         bot_call(bot.send_message, message.chat.id, "👑 Welcome Owner! Use the buttons below:", reply_markup=get_owner_keyboard())
         return
 
